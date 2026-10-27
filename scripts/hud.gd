@@ -348,7 +348,7 @@ func _show_panel(title: String, content: Array, buttons: Array) -> void:
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	dim.add_child(center)
 	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", -18)
+	column.add_theme_constant_override("separation", 6)
 	center.add_child(column)
 	var banner := UI.banner(title)
 	banner.z_index = 1
@@ -359,7 +359,6 @@ func _show_panel(title: String, content: Array, buttons: Array) -> void:
 	var inner := VBoxContainer.new()
 	inner.add_theme_constant_override("separation", 22)
 	panel.add_child(inner)
-	inner.add_child(Control.new())  # miesto pod transparentom
 	for node in content:
 		inner.add_child(node)
 	var row := HBoxContainer.new()

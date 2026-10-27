@@ -11,7 +11,11 @@ func _run() -> void:
 	var page: String = args[0]
 	var gs = root.get_node("GameState")
 	var content = root.get_node("Content")
-	if page.begins_with("editor") and page != "editor_svety" and page != "editor_levely":
+	if page in ["pauza", "koniec"]:
+		gs.current_world_id = "zelene_kopce"
+		gs.current_level_id = "l1"
+		change_scene_to_file("res://scenes/game.tscn")
+	elif page.begins_with("editor") and page != "editor_svety" and page != "editor_levely":
 		gs.editor_world_id = "zelene_kopce"
 		gs.editor_level_id = "l3"
 		change_scene_to_file("res://scenes/editor.tscn")
@@ -32,6 +36,10 @@ func _run() -> void:
 			scene.show_editor_levels(world)
 		"novy_svet":
 			scene.show_world_form({})
+		"pauza":
+			scene._hud.toggle_pause()
+		"koniec":
+			scene._hud.show_level_complete(2, 3, 37, 84.0, true, false)
 		"editor_star":
 			scene.camera.zoom = Vector2(2, 2)
 			scene.camera.position = Vector2(9 * 64, 8 * 64)

@@ -375,6 +375,7 @@ func _build_ui() -> void:
 		b.text = spec[1]
 		b.toggle_mode = true
 		b.custom_minimum_size = Vector2(104, 44)
+		UI.style_toggle(b)
 		b.pressed.connect(_set_tool.bind(spec[0]))
 		tools.add_child(b)
 		_tool_buttons[spec[0]] = b
@@ -395,6 +396,7 @@ func _build_ui() -> void:
 	for cat in Catalog.CATEGORIES:
 		var tab := _button(cat[1], _show_category.bind(cat[0]))
 		tab.toggle_mode = true
+		UI.style_toggle(tab)
 		tab.set_meta("cat", cat[0])
 		tab.add_to_group("editor_tab")
 		tabs.add_child(tab)
@@ -461,6 +463,7 @@ func _show_category(cat: String) -> void:
 		b.icon = load(Catalog.icon_path(id, world.get("terrain", "grass")))
 		b.expand_icon = true
 		b.custom_minimum_size = Vector2(68, 68)
+		UI.style_toggle(b, 6, 4)
 		b.tooltip_text = Catalog.get_item(id)["name"]
 		b.set_meta("id", id)
 		b.button_pressed = id == item
@@ -526,6 +529,7 @@ func _property_editor(key: String, target: Dictionary, defaults: Dictionary) -> 
 				b.toggle_mode = true
 				b.button_pressed = color == value
 				b.custom_minimum_size = Vector2(64, 52)
+				UI.style_toggle(b, 6, 4)
 				b.pressed.connect(func():
 					on_change.call(color)
 					_show_properties())

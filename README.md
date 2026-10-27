@@ -119,6 +119,7 @@ Screenshoty (potrebujú displej, napríklad `xvfb-run`): `tests/screenshot.gd` a
 | `scripts/entities/` | správanie blokov, predmetov a mobov |
 | `scripts/game.gd`, `hud.gd` | priebeh levelu a rozhranie |
 | `scripts/menu.gd`, `scripts/editor/` | menu a editor |
+| `scripts/ui_theme.gd` | vzhľad menu a panelov (Kenney UI Pack, font Baloo 2) |
 | `scripts/content.gd` | ukladanie svetov a levelov |
 | `data/worlds/` | svety dodávané s hrou |
 
@@ -135,8 +136,10 @@ Kenney (CC0):
 - Platformer Art Extended Enemies
 - Platformer Pack Remastered (čiastočky tehál)
 - Mobile Controls
-- UI Pack Adventure
+- UI Pack
 - Impact Sounds
 - Music Jingles
+
+Font Baloo 2 je pod licenciou SIL Open Font License.
 
 Licencie sú v `assets/licenses`.
