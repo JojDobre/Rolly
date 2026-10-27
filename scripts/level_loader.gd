@@ -78,7 +78,8 @@ func _build_cell(pos: Vector2i, cell: Dictionary) -> void:
 	var center := Vector2(pos.x * T + T / 2.0, pos.y * T + T / 2.0)
 	match item["kind"]:
 		"ground":
-			_sprite(_terrain_body, _terrain_tex(_ground_tile(pos)), center)
+			var ground := _sprite(_terrain_body, _terrain_tex(_ground_tile(pos)), center)
+			ground.flip_h = under_rising_slope(pos)
 		"solid":
 			_sprite(_terrain_body, _tex(id), center)
 		"platform":
@@ -210,6 +211,7 @@ func spawn_mob(id: String, center: Vector2, params := {}) -> Node:
 	enemy.move_range = int(p.get("range", 3))
 	enemy.frames_spec = p.get("frames", {})
 	enemy.sprite_prefix = p.get("sprite", "")
+	enemy.path = p.get("path", [])
 	enemy.position = center
 	enemy.z_index = 2
 	root.add_child(enemy)
@@ -347,7 +349,7 @@ func _ladder(pos: Vector2i, center: Vector2, id: String) -> void:
 
 
 func _slope(pos: Vector2i, center: Vector2) -> void:
-	var rising := _is(pos + Vector2i.RIGHT, "ground") or not _is_any(pos + Vector2i.LEFT, ["ground", "slope"])
+	var rising := slope_rising(pos)
 	var sprite := _sprite(_terrain_body, _terrain_tex("ramp_short_b"), center)
 	sprite.flip_h = rising
 	var points := PackedVector2Array([Vector2(-32, 32), Vector2(32, -32), Vector2(32, 32)]) if rising \
@@ -401,7 +403,20 @@ func _add_merged_solids() -> void:
 			x = x_end + 1
 
 
+## Svah stúpa doprava (k susednej zemi vpravo alebo nemá zem vľavo).
+func slope_rising(pos: Vector2i) -> bool:
+	return _is(pos + Vector2i.RIGHT, "ground") or not _is_any(pos + Vector2i.LEFT, ["ground", "slope"])
+
+
+## Zem priamo pod stúpajúcim svahom sa kreslí zrkadlovo (prechodová dlaždica).
+func under_rising_slope(pos: Vector2i) -> bool:
+	return _is(pos + Vector2i.UP, "slope") and slope_rising(pos + Vector2i.UP)
+
+
 func _ground_tile(pos: Vector2i) -> String:
+	# Pod svahom je prechodová dlaždica, na ktorej pokračuje tráva a obrys svahu.
+	if _is(pos + Vector2i.UP, "slope"):
+		return "ramp_short_a"
 	var up := _ground_at(pos + Vector2i.UP, false)
 	var down := _ground_at(pos + Vector2i.DOWN, true)
 	var left := _ground_at(pos + Vector2i.LEFT, true)

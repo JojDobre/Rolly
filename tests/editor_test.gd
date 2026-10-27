@@ -63,6 +63,18 @@ func _run() -> void:
 	check("výťah prevzal zelenú farbu", editor.tool_params.get("color") == "green")
 	editor._apply_tool(Vector2i(15, 10))
 
+	editor._select_item("slime_normal")
+	editor._apply_tool(Vector2i(20, 11))
+	editor._set_tool("edit")
+	editor._apply_tool(Vector2i(20, 11))
+	check("mob ponúka nastavenie cesty", editor._has_path_option("slime_normal"))
+	editor.tool = "path"
+	editor._apply_tool(Vector2i(17, 11))
+	editor._apply_tool(Vector2i(25, 11))
+	check("cesta moba sa uložila do bunky", editor.level["cells"]["20,11"].get("path") == [17, 11, 25, 11], str(editor.level["cells"]["20,11"]))
+	check("po zadaní cesty je nástroj znova Upraviť", editor.tool == "edit")
+	editor._set_tool("paint")
+
 	for x in [3, 4, 6]:
 		editor._select_item("star")
 		editor._apply_tool(Vector2i(x, 9))

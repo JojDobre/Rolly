@@ -1,16 +1,27 @@
 extends RefCounted
-## Vzhľad menu a panelov: Kenney UI Pack (lesklé farebné tlačidlá, biele karty) a font Baloo 2.
+## Moderný plochý vzhľad menu, panelov a editora: zaoblené rohy, jemné tiene,
+## farebné tlačidlá s hrubším spodným okrajom a font Baloo 2.
+## Ikony sú z Kenney UI Pack a Mobile Controls.
 
 const UI := "res://assets/ui/%s.png"
 const FONT_PATH := "res://assets/fonts/Baloo2.ttf"
 
-const INK := Color("2b3a55")        ## tmavý text
-const INK_SOFT := Color("5b6a85")   ## popisky
+const INK := Color("24304a")        ## tmavý text
+const INK_SOFT := Color("67748e")   ## popisky
 const WHITE := Color("ffffff")
-const OUTLINE := Color("1f2b44")    ## obrys veľkých nadpisov
+const OUTLINE := Color("1d2a45")    ## obrys veľkých nadpisov
+const CARD := Color(1, 1, 1, 0.96)
+const RADIUS := 20
 
-## Farby tlačidiel podľa významu.
-const COLORS := {"blue": "blue", "green": "green", "yellow": "yellow", "red": "red", "grey": "grey"}
+## Farba plochy a spodného okraja (tieňa) tlačidiel podľa významu.
+const COLORS := {
+	"blue": [Color("3b8df0"), Color("2a63b8")],
+	"green": [Color("37c76b"), Color("259450")],
+	"yellow": [Color("ffc83d"), Color("d79a12")],
+	"red": [Color("ff5d63"), Color("c63d44")],
+	"grey": [Color("eef1f7"), Color("c4cbdb")],
+	"dark": [Color("2c3a57"), Color("1b253b")],
+}
 
 static var _fonts := {}
 
@@ -30,42 +41,59 @@ static func make() -> Theme:
 	theme.default_font = font(600)
 	theme.default_font_size = 26
 
-	theme.set_stylebox("panel", "PanelContainer", _card(28))
-	theme.set_stylebox("panel", "Panel", _card(28))
-	_button_styles(theme, "Button", "blue", 22, 12)
-	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color", "font_hover_pressed_color"]:
-		theme.set_color(state, "Button", WHITE)
-	theme.set_color("font_disabled_color", "Button", Color(1, 1, 1, 0.7))
-	theme.set_color("font_outline_color", "Button", Color(0, 0, 0, 0.25))
-	theme.set_constant("outline_size", "Button", 6)
+	theme.set_stylebox("panel", "PanelContainer", card(26))
+	theme.set_stylebox("panel", "Panel", card(26))
+	_button_styles(theme, "Button", "blue", 22, 10)
+	_button_colors(theme, "Button", WHITE)
 	theme.set_font("font", "Button", font(700))
 
 	theme.set_color("font_color", "Label", INK)
 	theme.set_font("font", "Label", font(600))
 
-	var input := _box("extra_input_rectangle", 22, 18, 10)
+	var input := _flat(Color("f1f4f9"), 14, 18, 10)
+	input.border_color = Color("d5dbe7")
+	input.set_border_width_all(2)
+	var focus := input.duplicate()
+	focus.border_color = COLORS["blue"][0]
 	theme.set_stylebox("normal", "LineEdit", input)
-	theme.set_stylebox("focus", "LineEdit", input)
+	theme.set_stylebox("focus", "LineEdit", focus)
 	theme.set_stylebox("read_only", "LineEdit", input)
 	theme.set_color("font_color", "LineEdit", INK)
+	theme.set_color("font_placeholder_color", "LineEdit", INK_SOFT)
 	theme.set_color("caret_color", "LineEdit", INK)
 
-	_button_styles(theme, "OptionButton", "grey", 22, 12)
-	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
-		theme.set_color(state, "OptionButton", INK)
+	_button_styles(theme, "OptionButton", "grey", 18, 10)
+	_button_colors(theme, "OptionButton", INK)
 	theme.set_font("font", "OptionButton", font(700))
 
 	theme.set_icon("checked", "CheckBox", load(UI % "grey_check_square_color_checkmark"))
 	theme.set_icon("unchecked", "CheckBox", load(UI % "grey_check_square_grey"))
-	theme.set_color("font_color", "CheckBox", INK)
-	theme.set_color("font_hover_color", "CheckBox", INK)
-	theme.set_color("font_pressed_color", "CheckBox", INK)
+	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color"]:
+		theme.set_color(state, "CheckBox", INK)
 
-	theme.set_stylebox("panel", "PopupMenu", _card(12))
+	var popup := card(10)
+	theme.set_stylebox("panel", "PopupMenu", popup)
+	theme.set_stylebox("hover", "PopupMenu", _flat(Color("e7eefb"), 10, 8, 4))
 	theme.set_color("font_color", "PopupMenu", INK)
 	theme.set_color("font_hover_color", "PopupMenu", INK)
-	theme.set_stylebox("panel", "TooltipPanel", _card(10))
+	theme.set_stylebox("panel", "TooltipPanel", card(10))
 	theme.set_color("font_color", "TooltipLabel", INK)
+
+	var separator := StyleBoxLine.new()
+	separator.color = Color("dfe4ee")
+	separator.thickness = 2
+	theme.set_stylebox("separator", "HSeparator", separator)
+	var vseparator := separator.duplicate()
+	vseparator.vertical = true
+	theme.set_stylebox("separator", "VSeparator", vseparator)
+
+	var scroll := _flat(Color(0, 0, 0, 0.12), 6, 0, 0)
+	var grabber := _flat(Color(0.15, 0.2, 0.3, 0.45), 6, 0, 0)
+	for type in ["HScrollBar", "VScrollBar"]:
+		theme.set_stylebox("scroll", type, scroll)
+		theme.set_stylebox("grabber", type, grabber)
+		theme.set_stylebox("grabber_highlight", type, grabber)
+		theme.set_stylebox("grabber_pressed", type, grabber)
 	return theme
 
 
@@ -73,23 +101,22 @@ static func make() -> Theme:
 static func make_compact() -> Theme:
 	var theme := make()
 	theme.default_font_size = 20
-	theme.set_stylebox("panel", "PanelContainer", _card(8))
-	_button_styles(theme, "Button", "blue", 12, 6)
-	_button_styles(theme, "OptionButton", "grey", 12, 6)
+	theme.set_stylebox("panel", "PanelContainer", card(10))
+	_button_styles(theme, "Button", "blue", 12, 5)
+	_button_styles(theme, "OptionButton", "grey", 12, 5)
 	return theme
 
 
-## Tlačidlo v danej farbe: blue, green, yellow, red, grey.
+## Tlačidlo v danej farbe: blue, green, yellow, red, grey, dark.
 static func colored_button(text: String, color := "blue") -> Button:
 	var button := Button.new()
 	button.text = text
-	var styles := _styles(color, 22, 12)
+	var styles := _styles(color, 22, 10)
 	for state in styles:
 		button.add_theme_stylebox_override(state, styles[state])
-	if color in ["grey", "yellow"]:
-		for state in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
-			button.add_theme_color_override(state, INK)
-		button.add_theme_constant_override("outline_size", 0)
+	var ink := INK if color in ["grey", "yellow"] else WHITE
+	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color", "font_hover_pressed_color"]:
+		button.add_theme_color_override(state, ink)
 	return button
 
 
@@ -108,22 +135,16 @@ static func style_toggle(button: Button, h_pad := 10, v_pad := 6) -> void:
 	button.add_theme_stylebox_override("hover_pressed", on["hover"])
 	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color", "font_hover_pressed_color"]:
 		button.add_theme_color_override(state, INK)
-	button.add_theme_constant_override("outline_size", 0)
 
 
-## Okrúhle/štvorcové tlačidlo s ikonou.
+## Okrúhle (alebo zaoblené štvorcové) tlačidlo s ikonou.
 static func icon_button(icon: Texture2D, color := "blue", size := 72.0, rounded := true) -> Button:
 	var button := Button.new()
-	var base := "%s_button_%s" % [color, "round" if rounded else "square"]
-	# Celý obrázok sa roztiahne na štvorcové tlačidlo (bez 9-slice), aby kruh zostal kruhom.
-	var normal := _box(base + "_depth_gloss", 0, int(size * 0.2), int(size * 0.18))
-	normal.content_margin_bottom = int(size * 0.24)
-	var pressed := _box(base + "_depth_flat", 0, int(size * 0.2), int(size * 0.22))
-	pressed.content_margin_bottom = int(size * 0.2)
-	button.add_theme_stylebox_override("normal", normal)
-	button.add_theme_stylebox_override("hover", normal)
-	button.add_theme_stylebox_override("pressed", pressed)
-	button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	var radius := int(size / 2.0) if rounded else 16
+	var pad := int(size * 0.22)
+	var styles := _styles(color, pad, pad, radius)
+	for state in styles:
+		button.add_theme_stylebox_override(state, styles[state])
 	button.icon = icon
 	button.expand_icon = true
 	button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -131,7 +152,7 @@ static func icon_button(icon: Texture2D, color := "blue", size := 72.0, rounded 
 	return button
 
 
-## Veľký biely nadpis s tmavým obrysom.
+## Veľký biely nadpis s jemným obrysom a tieňom.
 static func title(text: String, size := 64) -> Label:
 	var label := Label.new()
 	label.text = text
@@ -140,23 +161,49 @@ static func title(text: String, size := 64) -> Label:
 	label.add_theme_font_size_override("font_size", size)
 	label.add_theme_color_override("font_color", WHITE)
 	label.add_theme_color_override("font_outline_color", OUTLINE)
-	label.add_theme_constant_override("outline_size", maxi(8, size / 6))
-	label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.25))
-	label.add_theme_constant_override("shadow_offset_y", maxi(3, size / 16))
+	label.add_theme_constant_override("outline_size", maxi(6, size / 9))
+	label.add_theme_color_override("font_shadow_color", Color(0.05, 0.1, 0.25, 0.35))
+	label.add_theme_constant_override("shadow_offset_y", maxi(3, size / 14))
+	label.add_theme_constant_override("shadow_offset_x", 0)
 	return label
 
 
-## Zachované kvôli starým volaniam: nadpis panelu.
+## Nadpis panelu (pauza, koniec levelu…).
 static func banner(text: String) -> Control:
-	return title(text, 52)
+	return title(text, 56)
 
 
-static func card(padding := 28) -> StyleBoxTexture:
-	return _card(padding)
+## Biela karta so zaoblenými rohmi a jemným tieňom.
+static func card(padding := 26) -> StyleBoxFlat:
+	var box := _flat(CARD, RADIUS, padding, padding)
+	box.shadow_color = Color(0.05, 0.1, 0.25, 0.18)
+	box.shadow_size = 14
+	box.shadow_offset = Vector2(0, 5)
+	return box
 
 
-static func _card(padding: int) -> StyleBoxTexture:
-	return _box("grey_button_square_flat", 24, padding, padding)
+## Štýly tlačidla: plocha + hrubší spodný okraj; pri stlačení sa „zatlačí“ dole.
+static func _styles(color: String, h_pad: int, v_pad: int, radius := 16) -> Dictionary:
+	var face: Color = COLORS[color][0]
+	var edge: Color = COLORS[color][1]
+	var normal := _flat(face, radius, h_pad, v_pad)
+	normal.border_color = edge
+	normal.border_width_bottom = 6
+	normal.content_margin_bottom = v_pad + 6
+	var hover := normal.duplicate()
+	hover.bg_color = face.lightened(0.08)
+	var pressed := normal.duplicate()
+	pressed.bg_color = face.darkened(0.06)
+	pressed.border_width_bottom = 2
+	pressed.content_margin_top = v_pad + 4
+	pressed.content_margin_bottom = v_pad + 2
+	pressed.expand_margin_top = -4
+	var disabled := _flat(Color("dfe3eb"), radius, h_pad, v_pad)
+	disabled.border_color = Color("c9cfdb")
+	disabled.border_width_bottom = 6
+	disabled.content_margin_bottom = v_pad + 6
+	return {"normal": normal, "hover": hover, "pressed": pressed, "hover_pressed": pressed,
+		"disabled": disabled, "focus": StyleBoxEmpty.new()}
 
 
 static func _button_styles(theme: Theme, type: String, color: String, h_pad: int, v_pad: int) -> void:
@@ -165,27 +212,18 @@ static func _button_styles(theme: Theme, type: String, color: String, h_pad: int
 		theme.set_stylebox(state, type, styles[state])
 
 
-static func _styles(color: String, h_pad: int, v_pad: int) -> Dictionary:
-	var normal := _box(color + "_button_rectangle_depth_gloss", 24, h_pad, v_pad)
-	normal.content_margin_bottom = v_pad + 6
-	var pressed := _box(color + "_button_rectangle_depth_flat", 24, h_pad, v_pad)
-	pressed.content_margin_top = v_pad + 4
-	pressed.content_margin_bottom = v_pad + 2
-	var hover := normal.duplicate()
-	hover.modulate_color = Color(1.06, 1.06, 1.06)
-	var disabled := _box("grey_button_rectangle_depth_flat", 24, h_pad, v_pad)
-	disabled.modulate_color = Color(1, 1, 1, 0.6)
-	return {"normal": normal, "hover": hover, "pressed": pressed, "hover_pressed": pressed,
-		"disabled": disabled, "focus": StyleBoxEmpty.new()}
+static func _button_colors(theme: Theme, type: String, ink: Color) -> void:
+	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color", "font_hover_pressed_color"]:
+		theme.set_color(state, type, ink)
+	theme.set_color("font_disabled_color", type, Color(INK, 0.45))
 
 
-static func _box(texture: String, margin: int, h_pad: int, v_pad: int) -> StyleBoxTexture:
-	var box := StyleBoxTexture.new()
-	box.texture = load(UI % texture)
-	box.texture_margin_left = margin
-	box.texture_margin_right = margin
-	box.texture_margin_top = margin
-	box.texture_margin_bottom = margin
+static func _flat(color: Color, radius: int, h_pad: int, v_pad: int) -> StyleBoxFlat:
+	var box := StyleBoxFlat.new()
+	box.bg_color = color
+	box.set_corner_radius_all(radius)
+	box.corner_detail = 8
+	box.anti_aliasing = true
 	box.content_margin_left = h_pad
 	box.content_margin_right = h_pad
 	box.content_margin_top = v_pad

@@ -10,6 +10,7 @@ var terrain := "grass"
 var hover := Vector2i(-1, -1)
 var selected := Vector2i(-1, -1)
 var problem_cells := {}  ## bunky, ktoré treba opraviť (zvýraznené)
+var path_preview: Array = []  ## body cesty, ktorú používateľ práve zadáva
 
 var _textures := {}
 var _loader := Loader.new()
@@ -39,6 +40,12 @@ func _draw() -> void:
 	for y in h + 1:
 		draw_line(Vector2(0, y * T), Vector2(w * T, y * T), grid, 1.0)
 	draw_rect(Rect2(0, 0, w * T, h * T), Color(0.1, 0.2, 0.35, 0.8), false, 3.0)
+	for pos in _loader.cells:
+		var path: Array = _loader.cells[pos].get("path", [])
+		if path.size() == 4:
+			_draw_path(pos, Vector2i(path[0], path[1]), Vector2i(path[2], path[3]))
+	for point in path_preview:
+		draw_circle(Vector2(point * T) + Vector2(T, T) / 2.0, 14.0, Color(1, 0.6, 0.1, 0.9))
 	for pos in problem_cells:
 		draw_rect(Rect2(pos * T, Vector2(T, T)), Color(1, 0.2, 0.1, 0.9), false, 4.0)
 	if selected.x >= 0:
@@ -57,11 +64,11 @@ func _draw_cell(pos: Vector2i, cell: Dictionary) -> void:
 		draw_texture_rect(_tile("water"), rect, false, Color(1, 1, 1, 0.8))
 	match item["kind"]:
 		"ground":
-			draw_texture_rect(_terrain(_loader._ground_tile(pos)), rect, false)
+			_draw_flipped(_terrain(_loader._ground_tile(pos)), rect, _loader.under_rising_slope(pos))
 		"platform":
 			draw_texture_rect(_terrain(_loader._platform_tile(pos)), rect, false)
 		"slope":
-			var rising: bool = _loader._is(pos + Vector2i.RIGHT, "ground") or not _loader._is_any(pos + Vector2i.LEFT, ["ground", "slope"])
+			var rising: bool = _loader.slope_rising(pos)
 			_draw_flipped(_terrain("ramp_short_b"), rect, rising)
 		"ladder":
 			var above: bool = _loader._is_any(pos + Vector2i.UP, ["ladder", "rope"])
@@ -107,6 +114,19 @@ func _draw_markers(pos: Vector2i, cell: Dictionary, item: Dictionary) -> void:
 		var end := start + Vector2(0, -T * distance if up else T * distance)
 		draw_dashed_line(start, end, Color(0.1, 0.3, 0.9, 0.8), 3.0, 8.0)
 		draw_rect(Rect2(end - Vector2(T / 2.0, T / 2.0), Vector2(T, T)), Color(0.1, 0.3, 0.9, 0.6), false, 2.0)
+
+
+## Cesta moba: oranžová prerušovaná čiara medzi začiatkom a koncom, tenká čiara k mobovi.
+func _draw_path(mob: Vector2i, a: Vector2i, b: Vector2i) -> void:
+	var half := Vector2(T, T) / 2.0
+	var pa := Vector2(a * T) + half
+	var pb := Vector2(b * T) + half
+	var color := Color(1, 0.55, 0.1, 0.95)
+	draw_dashed_line(pa, pb, color, 5.0, 12.0)
+	for p in [pa, pb]:
+		draw_circle(p, 12.0, color)
+		draw_circle(p, 6.0, Color.WHITE)
+	draw_line(Vector2(mob * T) + half, pa.lerp(pb, 0.5), Color(1, 0.55, 0.1, 0.4), 2.0)
 
 
 func _draw_fitted(texture: Texture2D, rect: Rect2) -> void:

@@ -18,12 +18,12 @@ const RADIUS := 26.0
 @export var air_acceleration := 1300.0
 @export var friction := 2200.0
 @export var gravity := 1500.0
-@export var jump_speed := 690.0      ## ~2,5 dlaždice (stena vysoká 2 dlaždice sa dá vyskočiť)
+@export var jump_speed := 800.0      ## ~3,3 dlaždice (stena vysoká 3 dlaždice sa dá vyskočiť, 4 už nie)
 @export var max_fall_speed := 900.0
 @export var climb_speed := 170.0
 @export var coyote_time := 0.1
 @export var jump_buffer := 0.12
-@export var push_force := 60.0
+@export var push_speed := 170.0     ## najvyššia rýchlosť tlačenej krabice
 @export var breath_seconds := 8.0
 @export var invulnerable_time := 1.5
 
@@ -49,6 +49,7 @@ var _hit_cooldown := 0.0
 var _won := false
 var _was_on_floor := true
 var _fall_speed := 0.0
+var _push_x := 0.0
 
 @onready var visual = $Visual  # player_visual.gd
 
@@ -158,6 +159,7 @@ func _physics_process(delta: float) -> void:
 		facing = signf(dir)
 	var rising := velocity.y < 0.0
 	_fall_speed = velocity.y
+	_push_x = velocity.x
 	move_and_slide()
 	_after_move(rising)
 	if is_on_floor() and not _was_on_floor and _fall_speed > 300.0:
@@ -175,9 +177,10 @@ func _after_move(was_rising: bool) -> void:
 		if was_rising and normal.y > 0.6 and _hit_cooldown <= 0.0 and collider and collider.has_method("hit_from_below"):
 			collider.hit_from_below(self)
 			_hit_cooldown = 0.15
-		# Tlačenie krabíc
-		if collider is RigidBody2D and absf(normal.x) > 0.6:
-			collider.apply_central_impulse(Vector2(-normal.x * push_force, 0.0))
+		# Tlačenie krabíc: krabica ide rovnomerne, najviac rýchlosťou hráča (žiadne odlietanie).
+		if collider is RigidBody2D and absf(normal.x) > 0.6 and is_on_floor():
+			var target := -normal.x * minf(absf(_push_x), push_speed)
+			collider.linear_velocity.x = move_toward(collider.linear_velocity.x, target, 25.0)
 		# Bloky s bodcami
 		if collider and collider.is_in_group("hurts_on_touch"):
 			hurt(collider.global_position)

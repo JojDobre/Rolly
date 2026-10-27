@@ -83,6 +83,8 @@ static func hint_for(id: String, params: Dictionary) -> String:
 		return "Páčka (%s) ovláda výťahy a farebné bloky svojej farby." % cname
 	if id == "lift":
 		return "Výťah (%s) potrebuje páčku rovnakej farby." % cname
+	if Catalog.get_item(id).get("kind", "") == "mob":
+		return "Cestu moba nastavíš: Upraviť → ťukni na moba → Nastaviť cestu."
 	if id == "door_exit":
 		return "Dvere sú 2 dlaždice vysoké – nad nimi nechaj voľné miesto."
 	return ""

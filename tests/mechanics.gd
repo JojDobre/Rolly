@@ -20,7 +20,7 @@ func _run() -> void:
 	var tests := ["chodza", "skok", "kluc", "mince_blok", "tehla", "tlacidlo", "packa_vytah", "pruzina",
 		"bomba", "mob_skok", "mob_zranenie", "bodce", "utopenie", "lava", "rebrik", "padajuci_blok",
 		"miznuci_most", "ciel", "drahokamy", "slimak_ulita", "krabica", "pas", "vsetky_moby", "zavazie",
-		"ukazka_vytah", "ukazka_bomba", "ukazka_kluce", "ukazka_pruzina"]
+		"ukazka_vytah", "ukazka_bomba", "ukazka_kluce", "ukazka_pruzina", "hadanka_krabica", "cesta_moba"]
 	for test in tests:
 		if only.size() > 0 and not only.has(test):
 			continue
@@ -112,15 +112,15 @@ func t_chodza() -> void:
 
 func t_skok() -> void:
 	print("Skok")
-	await _level({"8,8": "ground", "8,9": "ground"})
+	await _level({"8,7": "ground", "8,8": "ground", "8,9": "ground", "20,6": "ground", "20,7": "ground", "20,8": "ground", "20,9": "ground"})
 	var y0: float = game.player.global_position.y
 	Input.action_press("jump")
 	await _frames(20)
 	var y1: float = game.player.global_position.y
 	Input.action_release("jump")
-	check("vyskočí aspoň 1 dlaždicu", y0 - y1 > 64.0, str(y0 - y1))
+	check("vyskočí aspoň 2 dlaždice", y0 - y1 > 128.0, str(y0 - y1))
 	await _seconds(1.0)
-	# Na stenu vysokú 2 dlaždice sa dá vyskočiť
+	# Stena vysoká 3 dlaždice sa dá vyskočiť
 	await _put_player(6, 9)
 	Input.action_press("move_right")
 	Input.action_press("jump")
@@ -129,7 +129,17 @@ func t_skok() -> void:
 	await _seconds(0.4)
 	Input.action_release("move_right")
 	await _frames(10)
-	check("preskočí 2 dlaždice vysokú stenu", game.player.global_position.x > 9 * T, str(game.player.global_position))
+	check("preskočí 3 dlaždice vysokú stenu", game.player.global_position.x > 9 * T, str(game.player.global_position))
+	# Na 4 dlaždice už nie
+	await _put_player(18, 9)
+	Input.action_press("move_right")
+	Input.action_press("jump")
+	await _seconds(0.8)
+	Input.action_release("jump")
+	await _seconds(0.4)
+	Input.action_release("move_right")
+	await _frames(10)
+	check("4 dlaždice vysokú stenu nepreskočí", game.player.global_position.x < 20 * T, str(game.player.global_position))
 
 
 func t_kluc() -> void:
@@ -356,8 +366,20 @@ func t_krabica() -> void:
 	await _level({"5,9": "block_planks"})
 	var crate = get_nodes_in_group("bomb_breakable")[0]
 	var x0: float = crate.global_position.x
-	await _hold("move_right", 1.5)
+	var fastest := 0.0
+	Input.action_press("move_right")
+	for i in 90:
+		await physics_frame
+		fastest = maxf(fastest, absf(crate.linear_velocity.x))
+	Input.action_release("move_right")
 	check("krabica sa posunula", crate.global_position.x > x0 + 40.0, str(crate.global_position.x - x0))
+	check("krabica neodletí (rýchlosť do 200)", fastest <= 200.0, str(fastest))
+	# Rozbeh z diaľky a náraz do krabice
+	await _put_player(1, 9)
+	var before: float = crate.global_position.x
+	await _hold("move_right", 0.6)
+	await _seconds(1.0)
+	check("po náraze sa krabica zastaví blízko", crate.global_position.x - before < 4 * T, str(crate.global_position.x - before))
 
 
 func t_pas() -> void:
@@ -493,3 +515,71 @@ func t_ukazka_pruzina() -> void:
 	Input.action_release("move_right")
 	await _seconds(0.6)
 	check("hráč stojí na rímse", game.player.global_position.y < 7 * T and game.player.is_on_floor(), str(game.player.global_position))
+
+
+func t_hadanka_krabica() -> void:
+	print("Level Kľúč a krabica: bez krabice na rímsu nevyskočí, s krabicou áno")
+	var content = root.get_node("Content")
+	gs.test_world = content.get_world("zelene_kopce")
+	gs.test_level = content.get_level("zelene_kopce", "l3")
+	change_scene_to_file("res://scenes/game.tscn")
+	await process_frame
+	await process_frame
+	game = current_scene
+	await _frames(10)
+	# Bez krabice: priamo pod rímsou skáče márne
+	await _put_player(11, 11)
+	Input.action_press("move_right")
+	Input.action_press("jump")
+	await _seconds(0.7)
+	Input.action_release("jump")
+	Input.action_release("move_right")
+	await _seconds(0.5)
+	check("bez krabice sa na rímsu nedostane", game.player.global_position.y > 10 * T, str(game.player.global_position))
+	# S krabicou: dotlačí ju k rímse, vyskočí na ňu a potom na rímsu
+	await _put_player(5, 11)
+	await _hold("move_right", 2.0)
+	var crate = get_nodes_in_group("bomb_breakable")[0]
+	await _put_player(8, 11)
+	Input.action_press("move_right")
+	Input.action_press("jump")
+	await _seconds(0.5)
+	Input.action_release("jump")
+	for i in 90:
+		await physics_frame
+		if game.player.is_on_floor():
+			break
+	Input.action_press("jump")
+	await _seconds(0.6)
+	Input.action_release("jump")
+	await _seconds(0.4)
+	Input.action_release("move_right")
+	await _frames(20)
+	check("krabica je pri rímse", crate.global_position.x > 10 * T, str(crate.global_position))
+	check("z krabice vyskočí na rímsu", game.player.global_position.y < 8 * T, str(game.player.global_position))
+
+
+func t_cesta_moba() -> void:
+	print("Cesta moba")
+	await _level({
+		"8,9": {"t": "slime_normal", "path": [6, 9, 11, 9]},
+		"8,4": {"t": "bee", "path": [4, 4, 14, 2]},
+		"20,6": {"t": "saw_mob", "path": [18, 6, 24, 6]},
+	}, 30, 12)
+	game.player.global_position = _cell(1, 2)
+	var mobs := {}
+	for m in get_nodes_in_group("enemy"):
+		mobs[m.item_id] = {"node": m, "min": Vector2(INF, INF), "max": Vector2(-INF, -INF)}
+	for i in 600:
+		await physics_frame
+		for id in mobs:
+			var p: Vector2 = mobs[id]["node"].global_position
+			mobs[id]["min"] = mobs[id]["min"].min(p)
+			mobs[id]["max"] = mobs[id]["max"].max(p)
+	var slime: Dictionary = mobs["slime_normal"]
+	check("sliz chodí len po svojej ceste", slime["min"].x >= 6 * T and slime["max"].x <= 12 * T, str(slime["min"], slime["max"]))
+	check("sliz prejde celú cestu", slime["min"].x < 7 * T and slime["max"].x > 11 * T, str(slime["min"], slime["max"]))
+	var bee: Dictionary = mobs["bee"]
+	check("včela letí šikmo medzi bodmi cesty", bee["min"].x < 5 * T and bee["max"].x > 14 * T and bee["min"].y < 3 * T, str(bee["min"], bee["max"]))
+	var saw: Dictionary = mobs["saw_mob"]
+	check("píla jazdí medzi bodmi cesty", saw["min"].x < 19 * T and saw["max"].x > 24 * T, str(saw["min"], saw["max"]))

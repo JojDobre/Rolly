@@ -251,6 +251,7 @@ func _world_card(world: Dictionary, levels: Array) -> Control:
 	card.add_child(box)
 	var preview := TextureRect.new()
 	preview.texture = load("res://assets/npp/backgrounds/background_color_%s.png" % world.get("background", "hills"))
+	preview.clip_contents = true
 	preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	preview.custom_minimum_size = Vector2(256, 140)
@@ -309,14 +310,12 @@ func _level_button(world: Dictionary, levels: Array, index: int) -> Control:
 	var color := "blue" if unlocked else "grey"
 	if unlocked and GameState.is_completed(world["id"], level["id"]):
 		color = "green"
-	for state in ["normal", "hover", "pressed", "disabled"]:
-		var sb := StyleBoxTexture.new()
-		sb.texture = load(UI_TEX % ("%s_button_square_depth_%s" % [color, "flat" if state == "pressed" else "gloss"]))
-		for side in [SIDE_LEFT, SIDE_TOP, SIDE_RIGHT, SIDE_BOTTOM]:
-			sb.set_texture_margin(side, 30)
-		sb.content_margin_bottom = 16
-		button.add_theme_stylebox_override(state, sb)
-	button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	var styles := UI._styles(color, 8, 8, 28)
+	for state in styles:
+		button.add_theme_stylebox_override(state, styles[state])
+	button.add_theme_color_override("font_color", Color.WHITE)
+	button.add_theme_color_override("font_hover_color", Color.WHITE)
+	button.add_theme_color_override("font_pressed_color", Color.WHITE)
 	button.custom_minimum_size = Vector2(140, 140)
 	button.tooltip_text = level["name"]
 	if unlocked:

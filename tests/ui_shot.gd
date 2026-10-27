@@ -40,6 +40,16 @@ func _run() -> void:
 			scene._hud.toggle_pause()
 		"koniec":
 			scene._hud.show_level_complete(2, 3, 37, 84.0, true, false)
+		"editor_cesta":
+			scene._select_item("bee")
+			scene._apply_tool(Vector2i(8, 7))
+			scene.level["cells"]["8,7"]["path"] = [5, 6, 13, 8]
+			scene._select_item("slime_normal")
+			scene._apply_tool(Vector2i(20, 11))
+			scene.level["cells"]["20,11"]["path"] = [18, 11, 25, 11]
+			scene._set_tool("edit")
+			scene._apply_tool(Vector2i(8, 7))
+			scene.canvas.refresh()
 		"editor_star":
 			scene.camera.zoom = Vector2(2, 2)
 			scene.camera.position = Vector2(9 * 64, 8 * 64)

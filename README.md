@@ -15,7 +15,7 @@ Súčasťou hry je **editor svetov a levelov**.
 | Akcia | Klávesnica | Mobil |
 |---|---|---|
 | Chôdza | ← → / A D | šípky vľavo dole |
-| Skok (dlhšie držanie = vyšší) | medzerník / Z / J | okrúhle tlačidlo |
+| Skok (dlhšie držanie = vyšší, najviac 3 bloky) | medzerník / Z / J | okrúhle tlačidlo |
 | Rebrík hore / páčka | ↑ / W | šípka hore |
 | Rebrík dole | ↓ / S | šípka dole |
 | Zoskočiť z plošiny | dole + skok | dole + skok |
@@ -78,6 +78,7 @@ Hlavné menu → **Editor levelov**.
 3. **V editore:**
    - **Paleta dole** je rozdelená na kategórie. Terén sa kreslí v štýle sveta.
    - **Nástroje vľavo:** Kresliť, Guma, Posun (alebo dva prsty / pravé tlačidlo myši), Upraviť (nastavenie položeného predmetu). Priblíženie robíš štipnutím, kolieskom alebo tlačidlami +/−.
+   - **Cesta moba:** nástroj Upraviť → ťukni na moba → „Nastaviť cestu“ → ťukni na začiatok a koniec. Chodci sa na krajoch cesty otáčajú, letci, ryby a píly lietajú tam a späť (aj šikmo).
    - **Nastavenia predmetu** sú v paneli vpravo: farba páčky a výťahu, obsah bloku, smer, vzdialenosť, dosah bomby, čas tlačidla…
    - **Kontrola** hneď ukáže, čo v leveli chýba: kľúč bez zámku, tlačidlo bez blokov, páčka bez výťahu, chýbajúci štart, cieľ alebo hviezdy. Tlačidlom „Položiť“ rovno vyberieš chýbajúci predmet aj so správnou farbou.
    - **Skúsiť** spustí level bez straty životov. Z pauzy alebo po dokončení sa vrátiš do editora.
@@ -101,8 +102,8 @@ Ukážkový svet sa dá pregenerovať príkazom `python3 tools/demo_levels.py`.
 Automatické testy bežia v Godote bez okna:
 
 ```
-godot --headless --path . --script res://tests/mechanics.gd    # 53 testov mechaník
-godot --headless --path . --script res://tests/editor_test.gd  # 17 testov editora
+godot --headless --path . --script res://tests/mechanics.gd    # 63 testov mechaník
+godot --headless --path . --script res://tests/editor_test.gd  # 20 testov editora
 godot --headless --path . --script res://tests/compile_all.gd  # kontrola všetkých skriptov
 ```
 
@@ -119,7 +120,7 @@ Screenshoty (potrebujú displej, napríklad `xvfb-run`): `tests/screenshot.gd` a
 | `scripts/entities/` | správanie blokov, predmetov a mobov |
 | `scripts/game.gd`, `hud.gd` | priebeh levelu a rozhranie |
 | `scripts/menu.gd`, `scripts/editor/` | menu a editor |
-| `scripts/ui_theme.gd` | vzhľad menu a panelov (Kenney UI Pack, font Baloo 2) |
+| `scripts/ui_theme.gd` | plochý vzhľad menu, panelov a editora (font Baloo 2, ikony Kenney UI Pack) |
 | `scripts/content.gd` | ukladanie svetov a levelov |
 | `data/worlds/` | svety dodávané s hrou |
 

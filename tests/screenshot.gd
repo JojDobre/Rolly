@@ -20,6 +20,10 @@ func _run() -> void:
 	if args.size() > 3:
 		game.player.global_position.x = float(args[3]) * 64.0 + 32.0
 	var wait := float(args[4]) if args.size() > 4 else 1.5
+	var zoom_arg := float(args[5]) if args.size() > 5 else 0.0
+	if zoom_arg > 0.0:
+		game.camera.zoom = Vector2(zoom_arg, zoom_arg)
+		game._hud.visible = false
 	for i in int(wait * 60):
 		await process_frame
 	var image := root.get_texture().get_image()

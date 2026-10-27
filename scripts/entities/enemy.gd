@@ -13,7 +13,12 @@ var stompable := true
 var speed := 60.0
 var move_range := 3  ## dlaždice pre letcov a pílu
 var frames_spec := {}
-var sprite_prefix := ""  ## predpona obrázkov v assets/npp/enemies (ak sa líši od item_id)  ## obrázky pre moby z rozšíreného balíka: {animácia: [súbory]}
+var sprite_prefix := ""
+## Cesta z editora: [x1, y1, x2, y2] v bunkách. Chodci sa otáčajú na jej krajoch,
+## letci, ryby a píly sa pohybujú tam a späť medzi oboma bodmi.
+var path: Array = []
+
+const PATH_BEHAVIORS := ["walker", "snail", "hopper", "ladybug", "flyer", "flyer_vertical", "swimmer", "saw"]  ## predpona obrázkov v assets/npp/enemies (ak sa líši od item_id)  ## obrázky pre moby z rozšíreného balíka: {animácia: [súbory]}
 
 var dir := -1.0
 var dead := false
@@ -21,6 +26,10 @@ var dead := false
 var _sprite: AnimatedSprite2D
 var _hurtbox: Area2D
 var _start := Vector2.ZERO
+var _has_path := false
+var _path_a := Vector2.ZERO
+var _path_b := Vector2.ZERO
+var _path_t := 0.0
 var _time := 0.0
 var _timer := 0.0
 var _shell := false
@@ -36,6 +45,10 @@ func _ready() -> void:
 	floor_snap_length = 6.0
 	_start = position
 	_time = randf() * TAU
+	if path.size() == 4 and behavior in PATH_BEHAVIORS:
+		_has_path = true
+		_path_a = Vector2(path[0] * T + T / 2.0, path[1] * T + T / 2.0)
+		_path_b = Vector2(path[2] * T + T / 2.0, path[3] * T + T / 2.0)
 	_sprite = AnimatedSprite2D.new()
 	_sprite.sprite_frames = _build_frames()
 	_sprite.play("move" if _sprite.sprite_frames.has_animation("move") and behavior != "bat" else "rest")
@@ -163,7 +176,35 @@ func _walk(delta: float) -> void:
 	move_and_slide()
 	if is_on_wall() or (is_on_floor() and not _ground_ahead()):
 		dir = -dir
+	_keep_on_path()
 	_sprite.flip_h = dir > 0.0
+
+
+## Chodci: na krajoch cesty sa otočia.
+func _keep_on_path() -> void:
+	if not _has_path:
+		return
+	var left := minf(_path_a.x, _path_b.x)
+	var right := maxf(_path_a.x, _path_b.x)
+	if dir < 0.0 and position.x <= left:
+		dir = 1.0
+	elif dir > 0.0 and position.x >= right:
+		dir = -1.0
+
+
+## Letci, ryby a píly: plynulo tam a späť medzi bodmi cesty. Vráti true, ak cestu majú.
+func _follow_path(delta: float) -> bool:
+	if not _has_path:
+		return false
+	var length := maxf(_path_a.distance_to(_path_b), 1.0)
+	_path_t += delta * speed / length
+	var k := pingpong(_path_t, 1.0)
+	var smooth := k * k * (3.0 - 2.0 * k)
+	var previous := position
+	position = _path_a.lerp(_path_b, smooth)
+	if absf(position.x - previous.x) > 0.01:
+		_sprite.flip_h = position.x > previous.x
+	return true
 
 
 func _hop(delta: float) -> void:
@@ -182,6 +223,7 @@ func _hop(delta: float) -> void:
 	move_and_slide()
 	if is_on_wall():
 		dir = -dir
+	_keep_on_path()
 	_sprite.flip_h = dir > 0.0
 
 
@@ -214,6 +256,8 @@ func _frog(delta: float) -> void:
 
 
 func _fly(vertical: bool) -> void:
+	if _follow_path(get_physics_process_delta_time()):
+		return
 	var span := move_range * T
 	var phase := _time * speed / maxf(span, 1.0)
 	var offset := sin(phase) * span
@@ -225,6 +269,8 @@ func _fly(vertical: bool) -> void:
 
 
 func _swim(_delta: float) -> void:
+	if _follow_path(_delta):
+		return
 	var game = get_tree().get_first_node_in_group("game")
 	var ahead := Vector2i(floori((global_position.x + dir * 36.0) / T), floori(global_position.y / T))
 	if game and not game.is_water(ahead):
@@ -256,6 +302,9 @@ func _barnacle() -> void:
 
 
 func _saw() -> void:
+	_sprite.rotation += 0.25 if _has_path else 0.0
+	if _follow_path(get_physics_process_delta_time()):
+		return
 	var span := move_range * T
 	position.x = _start.x + sin(_time * speed / maxf(span, 1.0)) * span
 	_sprite.rotation += 0.25

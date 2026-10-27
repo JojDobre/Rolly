@@ -9,6 +9,7 @@ const Catalog := preload("res://scripts/catalog.gd")
 const Validator := preload("res://scripts/level_validator.gd")
 const UI := preload("res://scripts/ui_theme.gd")
 const MENU := preload("res://scripts/menu.gd")
+const ENEMY := preload("res://scripts/entities/enemy.gd")
 const T := 64
 const MIN_ZOOM := 0.25
 const MAX_ZOOM := 2.0
@@ -45,7 +46,8 @@ var _problems_box: VBoxContainer
 var _check_button: Button
 var _toast: Label
 var _toast_tween: Tween
-var _ui_panels: Array = []    ## panely rozhrania – dotyk na nich nekreslí do levelu
+var _ui_panels: Array = []
+var _path_points: Array = []  ## body cesty moba počas jej zadávania    ## panely rozhrania – dotyk na nich nekreslí do levelu
 
 
 func _ready() -> void:
@@ -149,8 +151,9 @@ func _begin_stroke(screen_pos: Vector2) -> void:
 		return
 	_painting = true
 	_stroke_saved = false
+	var was_tool := tool
 	_apply_tool(_cell_at(screen_pos))
-	if tool == "edit":
+	if was_tool == "edit" or was_tool == "path":
 		_painting = false
 
 
@@ -194,6 +197,27 @@ func _apply_tool(cell: Vector2i) -> void:
 			canvas.selected = cell
 			_show_properties()
 			canvas.queue_redraw()
+			return
+		"path":
+			_path_points.append(cell)
+			canvas.path_preview = _path_points.duplicate()
+			if _path_points.size() == 1:
+				_show_toast("Teraz ťukni na KONIEC cesty.")
+				canvas.queue_redraw()
+				return
+			var mob_key := "%d,%d" % [_edit_cell.x, _edit_cell.y]
+			if cells.has(mob_key):
+				_save_undo()
+				var a: Vector2i = _path_points[0]
+				var b: Vector2i = _path_points[1]
+				cells[mob_key]["path"] = [a.x, a.y, b.x, b.y]
+				_show_toast("Cesta je nastavená.")
+			_path_points.clear()
+			canvas.path_preview = []
+			tool = "edit"
+			canvas.refresh()
+			_show_properties()
+			dirty = true
 			return
 	dirty = true
 	canvas.refresh()
@@ -504,10 +528,55 @@ func _show_properties() -> void:
 			continue
 		any = true
 		_props_box.add_child(_property_editor(key, target, defaults))
+	if _has_path_option(id):
+		any = true
+		_props_box.add_child(_path_editor(target))
 	if not any:
 		_props_box.add_child(_small("Tento predmet nemá nastavenia."))
 	elif tool == "edit" or tool == "paint":
 		_open_side(true)
+
+
+func _has_path_option(id: String) -> bool:
+	var item_def := Catalog.get_item(id)
+	return item_def.get("kind", "") == "mob" and ENEMY.PATH_BEHAVIORS.has(item_def["params"].get("behavior", ""))
+
+
+## Cesta moba: začiatok a koniec (nastavuje sa ťuknutím v leveli).
+func _path_editor(target: Dictionary) -> Control:
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 6)
+	var path: Array = target.get("path", [])
+	var caption := "Cesta: nenastavená (mob chodí sám)" if path.size() != 4 \
+			else "Cesta: z [%d, %d] do [%d, %d]" % [path[0], path[1], path[2], path[3]]
+	var label := _small(caption)
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(label)
+	if tool == "edit":
+		var row := HBoxContainer.new()
+		var set_path := UI.colored_button("Nastaviť cestu", "green")
+		set_path.pressed.connect(func():
+			tool = "path"
+			_path_points.clear()
+			for key in _tool_buttons:
+				_tool_buttons[key].button_pressed = false
+			_show_toast("Ťukni na ZAČIATOK cesty."))
+		row.add_child(set_path)
+		if path.size() == 4:
+			var clear := UI.colored_button("Zrušiť", "red")
+			clear.pressed.connect(func():
+				target.erase("path")
+				dirty = true
+				canvas.refresh()
+				_show_properties())
+			row.add_child(clear)
+		box.add_child(row)
+	else:
+		var hint := _small("Cestu nastavíš: Upraviť → ťukni na moba → Nastaviť cestu.")
+		hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		hint.add_theme_color_override("font_color", UI.INK_SOFT)
+		box.add_child(hint)
+	return box
 
 
 func _property_editor(key: String, target: Dictionary, defaults: Dictionary) -> Control:
@@ -582,7 +651,9 @@ func _refresh_problems() -> void:
 		child.queue_free()
 	var problems := Validator.check(level)
 	_check_button.text = "Kontrola" if problems.is_empty() else "Kontrola (%d)" % problems.size()
-	_check_button.modulate = Color.WHITE if problems.is_empty() else Color(1, 0.75, 0.7)
+	var check_styles := UI._styles("blue" if problems.is_empty() else "red", 12, 5)
+	for state in check_styles:
+		_check_button.add_theme_stylebox_override(state, check_styles[state])
 	var header := _small("Level je v poriadku." if problems.is_empty() else "Čo ešte chýba:")
 	header.add_theme_font_size_override("font_size", 24)
 	_problems_box.add_child(header)
