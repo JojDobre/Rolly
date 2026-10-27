@@ -13,11 +13,10 @@ extends RefCounted
 const T := 64
 const SOLID := "#/"
 
+const CRATE_SIZE := 68.0  ## o kúsok väčšia ako gulička (priemer 52)
+
 const PICKUP := preload("res://scripts/pickup.gd")
-const TEX_TOP := preload("res://assets/tiles/tileGreen_05.png")
-const TEX_FILL := preload("res://assets/tiles/tileGreen_03.png")
-const TEX_SLOPE := preload("res://assets/tiles/tileGreen_09.png")
-const TEX_PLATFORM := preload("res://assets/tiles/tileGreen_27.png")
+const TERRAIN_ART := preload("res://scripts/terrain_art.gd")
 const TEX_SPIKES := preload("res://assets/objects/spikesLow.png")
 const TEX_STAR := preload("res://assets/items/starGold.png")
 const TEX_KEY := preload("res://assets/objects/keyRed.png")
@@ -51,6 +50,11 @@ func build(map: Array, world: Node2D) -> Dictionary:
 	material.friction = 1.0
 	terrain.physics_material_override = material
 	world.add_child(terrain)
+	var art = TERRAIN_ART.new()
+	art.name = "TerrainArt"
+	art.map = map
+	art.cols = cols
+	terrain.add_child(art)
 
 	for y in map.size():
 		for x in cols:
@@ -65,18 +69,11 @@ func _build_cell(c: String, x: int, y: int, map: Array, world: Node2D, terrain: 
 	var center := Vector2(x * T + T / 2.0, y * T + T / 2.0)
 	var bottom := Vector2(center.x, (y + 1) * T)
 	match c:
-		".", " ", "":
-			pass
-		"#":
-			var above := _cell(map, x, y - 1)
-			_sprite(terrain, TEX_FILL if SOLID.contains(above) and above != "" else TEX_TOP, center)
-		"=":
-			_sprite(terrain, TEX_PLATFORM, Vector2(center.x, y * T + 25))
+		".", " ", "", "#", "=":
+			pass  # zem a plošiny kreslí terrain_art.gd, kolízie _add_merged_rects
 		"/":
 			# Svah stúpa smerom k susednému bloku zeme.
 			var rising := _cell(map, x + 1, y) == "#" or not SOLID.contains(_cell(map, x - 1, y)) or _cell(map, x - 1, y) == ""
-			var sprite := _sprite(terrain, TEX_SLOPE, center)
-			sprite.flip_h = not rising
 			var triangle := ConvexPolygonShape2D.new()
 			if rising:
 				triangle.points = PackedVector2Array([Vector2(-32, 32), Vector2(32, -32), Vector2(32, 32)])
@@ -119,7 +116,7 @@ func _build_cell(c: String, x: int, y: int, map: Array, world: Node2D, terrain: 
 			world.add_child(finish)
 			result["finish"] = finish
 		"B", "M":
-			world.add_child(_crate(c == "M", center))
+			world.add_child(_crate(c == "M", bottom - Vector2(0, CRATE_SIZE / 2.0)))
 		">":
 			var arrow := _sprite(world, TEX_SIGN, bottom)
 			arrow.offset = Vector2(0, -TEX_SIGN.get_height() / 2.0)
@@ -215,11 +212,12 @@ func _flag(texture: Texture2D, bottom: Vector2) -> Area2D:
 func _crate(heavy: bool, pos: Vector2) -> RigidBody2D:
 	var crate := RigidBody2D.new()
 	crate.position = pos
-	crate.mass = 3.0 if heavy else 0.6
+	crate.add_to_group("pushable")
+	crate.mass = 1.6 if heavy else 0.4
 	var material := PhysicsMaterial.new()
-	material.friction = 0.8
+	material.friction = 0.5 if heavy else 0.3
 	crate.physics_material_override = material
 	var sprite := _sprite(crate, TEX_CRATE_METAL if heavy else TEX_CRATE_WOOD, Vector2.ZERO)
-	sprite.scale = Vector2.ONE * (62.0 / 70.0)
-	crate.add_child(_rect_shape(Vector2(62, 62), Vector2.ZERO))
+	sprite.scale = Vector2.ONE * (CRATE_SIZE / 70.0)
+	crate.add_child(_rect_shape(Vector2(CRATE_SIZE, CRATE_SIZE), Vector2.ZERO))
 	return crate

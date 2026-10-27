@@ -9,9 +9,10 @@ signal jumped
 @export var brake := 10.0           ## brzdenie, keď hráč nič nedrží
 @export var air_force := 1400.0     ## ovládanie vo vzduchu
 @export var max_speed := 520.0
-@export var jump_speed := 835.0     ## ~3,4 dlaždice vysoko pri gravitácii 1600
+@export var jump_speed := 700.0     ## ~2,4 dlaždice vysoko pri gravitácii 1600
 @export var coyote_time := 0.1      ## skok ešte chvíľu po zídení z hrany
 @export var jump_buffer := 0.12     ## skok stlačený tesne pred dopadom
+@export var push_force := 900.0     ## pomoc pri tlačení krabíc, aby sa nemusela rozbiehať
 
 var input_enabled := true
 
@@ -43,18 +44,23 @@ func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 		_prev_vy = 0.0
 		return
 
+	var dir := Input.get_axis("move_left", "move_right") if input_enabled else 0.0
 	var was_grounded := _grounded
 	_grounded = false
 	for i in state.get_contact_count():
-		if state.get_contact_local_normal(i).dot(Vector2.UP) > 0.55:
+		var normal := state.get_contact_local_normal(i)
+		if normal.dot(Vector2.UP) > 0.55:
 			_grounded = true
-			break
+		# Krabica pred guličkou v smere pohybu dostane extra postrčenie.
+		elif dir != 0.0 and normal.x * dir < -0.5:
+			var crate := state.get_contact_collider_object(i) as RigidBody2D
+			if crate and crate.is_in_group("pushable"):
+				crate.apply_central_force(Vector2(dir * push_force, 0.0))
 	if _grounded:
 		_since_ground = 0.0
 		if not was_grounded and _prev_vy > 0.0:
 			landed.emit(_prev_vy)
 
-	var dir := Input.get_axis("move_left", "move_right") if input_enabled else 0.0
 	var velocity := state.linear_velocity
 
 	if dir != 0.0:

@@ -3,13 +3,13 @@ extends Node2D
 
 const BUILDER := preload("res://scripts/level_builder.gd")
 const HUD := preload("res://scripts/hud.gd")
-const TEX_SKY := preload("res://assets/bg/sky_grass.png")
+const BACKGROUND := preload("res://scripts/background.gd")
 const TEX_FLAG_RED_UP := preload("res://assets/objects/flagRed_up.png")
 const TEX_FLAG_GREEN_UP := preload("res://assets/objects/flagGreen_up.png")
 const BALL := preload("res://scripts/ball.gd")
 const FALL_MARGIN := 300.0
 const T_EXTRA := 256  ## koľko je kamera ochotná ukázať nad levelom
-const PARALLAX := 0.25
+const LOOK_AHEAD := 110.0
 
 var level := 1
 var stars_total := 0
@@ -22,7 +22,6 @@ var _level_size := Vector2.ZERO
 var _dead := false
 var _shake := 0.0
 var _hud: HUD
-var _sky: Sprite2D
 
 @onready var ball: BALL = $Ball
 @onready var camera: Camera2D = $Camera2D
@@ -63,13 +62,14 @@ func _ready() -> void:
 	camera.global_position = info["start"]
 	camera.reset_smoothing()
 
-	_build_background()
+	var background = BACKGROUND.new()
+	background.camera = camera
+	add_child(background)
 	_hud = HUD.new()
 	_hud.game = self
 	add_child(_hud)
 	_hud.set_level_title(level, data.TITLE)
 	_hud.update_stars(stars_collected, stars_total)
-
 
 
 func _process(delta: float) -> void:
@@ -78,32 +78,14 @@ func _process(delta: float) -> void:
 		_hud.update_time(elapsed)
 
 	if not _dead:
-		var look_ahead := Vector2(clampf(ball.linear_velocity.x * 0.25, -160.0, 160.0), 0.0)
+		var look_ahead := Vector2(clampf(ball.linear_velocity.x * 0.2, -LOOK_AHEAD, LOOK_AHEAD), 0.0)
 		camera.global_position = ball.global_position + look_ahead
 
 	_shake = move_toward(_shake, 0.0, 60.0 * delta)
 	camera.offset = Vector2(randf_range(-_shake, _shake), randf_range(-_shake, _shake))
 
-	var view_size := get_viewport_rect().size
-	var sky_scale := view_size.y / TEX_SKY.get_height()
-	_sky.scale = Vector2(sky_scale, sky_scale)
-	_sky.region_rect = Rect2(camera.get_screen_center_position().x * PARALLAX / sky_scale, 0.0,
-			view_size.x / sky_scale + 2.0, TEX_SKY.get_height())
-
 	if not _dead and ball.global_position.y > _level_size.y + FALL_MARGIN:
 		_die()
-
-
-func _build_background() -> void:
-	var layer := CanvasLayer.new()
-	layer.layer = -10
-	add_child(layer)
-	_sky = Sprite2D.new()
-	_sky.texture = TEX_SKY
-	_sky.centered = false
-	_sky.region_enabled = true
-	_sky.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
-	layer.add_child(_sky)
 
 
 # --- Udalosti -------------------------------------------------------------

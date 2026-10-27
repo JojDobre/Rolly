@@ -2,7 +2,7 @@ extends Control
 ## Hlavné menu: výber levelu, životy a odpočet do ďalšieho života.
 
 const UI := preload("res://scripts/ui_theme.gd")
-const TEX_SKY := preload("res://assets/bg/sky_grass.png")
+const BACKGROUND := preload("res://scripts/background.gd")
 const TEX_STAR := preload("res://assets/items/starGold.png")
 const TEX_STAR_EMPTY := preload("res://assets/items/starSilver.png")
 const TEX_LIFE := preload("res://assets/ui/ball_icon.png")
@@ -15,12 +15,7 @@ var _message: Label
 
 func _ready() -> void:
 	theme = UI.make()
-	var sky := TextureRect.new()
-	sky.texture = TEX_SKY
-	sky.set_anchors_preset(Control.PRESET_FULL_RECT)
-	sky.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	sky.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	add_child(sky)
+	add_child(BACKGROUND.new())
 
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)

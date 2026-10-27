@@ -48,8 +48,8 @@ K  kľúč           L  zámok            >  šípka (ozdoba)
 - Svah `/` sa sám natočí smerom k susednému bloku zeme.
 - Nový level pridáš tak, že skopíruješ `level_03.gd` ako `level_04.gd` a v `scripts/game_state.gd` zvýšiš `LEVEL_COUNT`.
 
-Pre orientáciu: skok je vysoký asi 3 dlaždice (4 dlaždice už nevyskočí) a cez jamu široká 4 dlaždice sa preskočí.
-Náhľad súčasných levelov je v `levels_preview.png`.
+Pre orientáciu: skok je vysoký asi 2 dlaždice (na 3 dlaždice sa už nedá vyskočiť, iba z krabice) a cez jamu širokú 4 dlaždice sa preskočí.
+Náhľad levelov je v `levels_preview.png`. Po úprave levelu ho obnovíš príkazom `python3 tools/preview_levels.py`.
 
 ## Kde čo je
 
@@ -58,11 +58,14 @@ Náhľad súčasných levelov je v `levels_preview.png`.
 | `scripts/ball.gd` | fyzika a ovládanie guličky (rýchlosť, výška skoku – dá sa meniť v Inspectore) |
 | `scripts/ball_visual.gd` | vzhľad guličky (farby, oči, sploštenie) |
 | `scripts/game.gd` | priebeh levelu: hviezdy, smrť, checkpoint, cieľ, kamera |
-| `scripts/level_builder.gd` | z textovej mapy postaví level |
+| `scripts/level_builder.gd` | z textovej mapy postaví level (kolízie, predmety, krabice) |
+| `scripts/terrain_art.gd` | kreslí terén v štýle Red Ball: tráva, hlina, obrys |
+| `scripts/background.gd` | pozadie: nebo, oblaky a kopce s paralaxou |
 | `scripts/hud.gd` | rozhranie počas hry a panely (pauza, koniec levelu, došli životy) |
 | `scripts/menu.gd` | hlavné menu a výber levelov |
 | `scripts/game_state.gd` | životy, ukladanie, zvuky, miesta pre reklamy |
-| `assets/` | grafika a zvuky (Kenney, GameArt2D – licencie v `assets/licenses`) |
+| `assets/world/` | vlastná grafika sveta, vygenerovaná skriptom `tools/generate_art.py` |
+| `assets/` | ostatná grafika a zvuky (Kenney, GameArt2D – licencie v `assets/licenses`) |
 | `assets/worlds/` | pripravené dlaždice pre svet Továreň a Vesmír |
 
 ## Reklamy

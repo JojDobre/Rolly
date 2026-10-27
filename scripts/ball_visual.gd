@@ -2,7 +2,7 @@ extends Node2D
 ## Vzhľad guličky: kreslí ju kód, takže je to naša vlastná postava.
 ## Oči sa nekrútia s guličkou, pozerajú sa tam, kam letí, a občas žmurknú.
 
-const RADIUS := 28.0
+const RADIUS := 26.0
 const OUTLINE := Color("8c1612")
 const BODY := Color("e2392f")
 const STRIPE := Color("f26a5f")
