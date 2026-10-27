@@ -8,11 +8,12 @@ config/name="Gulicka"
 config/description="Fyzikálna plošinovka s guličkou, ktorá zbiera hviezdy."
 run/main_scene="res://scenes/menu.tscn"
 config/features=PackedStringArray("4.4", "GL Compatibility")
-config/icon="res://assets/objects/star.png"
+config/icon="res://assets/npp/tiles/star.png"
 
 [autoload]
 
 GameState="*res://scripts/game_state.gd"
+Content="*res://scripts/content.gd"
 
 [display]
 
@@ -25,6 +26,14 @@ window/handheld/orientation=0
 [input_devices]
 
 pointing/emulate_touch_from_mouse=true
+
+[layer_names]
+
+2d_physics/layer_1="svet"
+2d_physics/layer_2="plosiny"
+2d_physics/layer_3="hrac"
+2d_physics/layer_4="moby"
+2d_physics/layer_5="predmety"
 
 [physics]
 

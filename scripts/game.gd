@@ -1,102 +1,163 @@
 extends Node2D
-## Jeden level: postaví mapu, sleduje hviezdy, smrť, checkpointy a cieľ.
+## Jeden level: postaví ho z dát, riadi hráča, zbieranie, mechanizmy, výbuchy, smrť a cieľ.
+## Ak je GameState.test_level nastavený, hrá sa testovacia verzia z editora.
 
-const BUILDER := preload("res://scripts/level_builder.gd")
+const Catalog := preload("res://scripts/catalog.gd")
+const Loader := preload("res://scripts/level_loader.gd")
 const HUD := preload("res://scripts/hud.gd")
 const BACKGROUND := preload("res://scripts/background.gd")
-const BALL := preload("res://scripts/ball.gd")
+const PLAYER_SCENE := preload("res://scenes/player.tscn")
+const T := 64
 const FALL_MARGIN := 300.0
-const T_EXTRA := 256  ## koľko je kamera ochotná ukázať nad levelom
-const LOOK_AHEAD := 110.0
+const LOOK_AHEAD := 90.0
 
-var level := 1
+var world: Dictionary
+var level: Dictionary
+var test_mode := false
+var player: CharacterBody2D
+
 var stars_total := 0
 var stars_collected := 0
+var coins := 0
+var keys := {}  # farba -> true
 var elapsed := 0.0
 var running := true
 
+var _loader: Loader
+var _hud: HUD
 var _respawn_point := Vector2.ZERO
 var _level_size := Vector2.ZERO
-var _dead := false
+var _levers := {}       # farba -> bool
+var _switch_until := {} # farba -> čas konca v sekundách
 var _shake := 0.0
-var _hud: HUD
 
-@onready var ball: BALL = $Ball
 @onready var camera: Camera2D = $Camera2D
-@onready var world: Node2D = $World
+@onready var level_root: Node2D = $World
 
 
 func _ready() -> void:
-	level = GameState.current_level
-	var data = load("res://levels/level_%02d.gd" % level)
-	var info: Dictionary = BUILDER.new().build(data.MAP, world)
-
-	_level_size = info["size"]
-	_respawn_point = info["start"]
-	ball.add_to_group("player")
-	ball.respawn(info["start"])
-	ball.global_position = info["start"]
-	ball.landed.connect(_on_ball_landed)
-	ball.jumped.connect(_on_ball_jumped)
-
-	stars_total = info["stars"].size()
-	for star in info["stars"]:
-		star.collected.connect(_on_star_collected)
-	for key in info["keys"]:
-		key.collected.connect(_on_key_collected.bind(info["locks"]))
-	for hazard in info["hazards"]:
-		hazard.body_entered.connect(_on_hazard_body_entered)
-	for checkpoint in info["checkpoints"]:
-		checkpoint.body_entered.connect(_on_checkpoint_body_entered.bind(checkpoint))
-	if info["finish"]:
-		info["finish"].body_entered.connect(_on_finish_body_entered.bind(info["finish"]))
+	add_to_group("game")
+	test_mode = not GameState.test_level.is_empty()
+	if test_mode:
+		world = GameState.test_world
+		level = GameState.test_level
 	else:
-		push_error("Level %d nemá cieľ (F)" % level)
+		world = Content.get_world(GameState.current_world_id)
+		level = Content.get_level(GameState.current_world_id, GameState.current_level_id)
+	if level.is_empty():
+		push_error("Level sa nenašiel: %s / %s" % [GameState.current_world_id, GameState.current_level_id])
+		get_tree().change_scene_to_file.call_deferred("res://scenes/menu.tscn")
+		return
+
+	_loader = Loader.new()
+	_loader.build(level, world, level_root)
+	_level_size = Vector2(_loader.width * T, _loader.height * T)
+	stars_total = _loader.star_count
+	_respawn_point = _loader.start
+
+	player = PLAYER_SCENE.instantiate()
+	player.game = self
+	player.position = _loader.start
+	player.z_index = 5
+	level_root.add_child(player)
+	player.set_character(GameState.character)
+	player.died.connect(_on_player_died)
 
 	camera.limit_left = 0
-	camera.limit_top = -T_EXTRA
+	camera.limit_top = -T * 4
 	camera.limit_right = int(_level_size.x)
 	camera.limit_bottom = int(_level_size.y)
-	camera.global_position = info["start"]
+	camera.global_position = player.global_position
 	camera.reset_smoothing()
 
 	var background = BACKGROUND.new()
 	background.camera = camera
+	background.style = world.get("background", "hills")
 	add_child(background)
+
 	_hud = HUD.new()
 	_hud.game = self
 	add_child(_hud)
-	_hud.set_level_title(level, data.TITLE)
+	_hud.bind_player(player)
+	_hud.set_level_title(level.get("name", ""))
 	_hud.update_stars(stars_collected, stars_total)
-	GameState.play_music(GameState.LEVEL_PLAYLIST)
+	_hud.update_coins(coins)
+	GameState.play_music(GameState.playlist_for(world))
 
 
 func _process(delta: float) -> void:
-	if running and not _dead:
+	if player == null:
+		return
+	if running and not player.dead:
 		elapsed += delta
 		_hud.update_time(elapsed)
+		var look := Vector2(clampf(player.velocity.x * 0.3, -LOOK_AHEAD, LOOK_AHEAD), 0.0)
+		camera.global_position = player.global_position + look
+		if player.global_position.y > _level_size.y + FALL_MARGIN:
+			player.die()
 
-	if not _dead:
-		var look_ahead := Vector2(clampf(ball.linear_velocity.x * 0.2, -LOOK_AHEAD, LOOK_AHEAD), 0.0)
-		camera.global_position = ball.global_position + look_ahead
-
-	_shake = move_toward(_shake, 0.0, 60.0 * delta)
+	_shake = move_toward(_shake, 0.0, 50.0 * delta)
 	camera.offset = Vector2(randf_range(-_shake, _shake), randf_range(-_shake, _shake))
 
-	if not _dead and ball.global_position.y > _level_size.y + FALL_MARGIN:
-		_die()
+	var now := Time.get_ticks_msec() / 1000.0
+	for color in _switch_until.keys():
+		if now >= _switch_until[color]:
+			_switch_until.erase(color)
+			_update_channel(color)
 
 
-# --- Udalosti -------------------------------------------------------------
+# --- Mriežka (voda, láva, rebríky) ------------------------------------------
 
-func _on_star_collected() -> void:
-	stars_collected += 1
-	_hud.update_stars(stars_collected, stars_total)
+func is_water(cell: Vector2i) -> bool:
+	return _loader != null and _loader.water.has(cell)
 
 
-func _on_key_collected(locks: Array) -> void:
+func is_lava(cell: Vector2i) -> bool:
+	return _loader != null and _loader.lava.has(cell)
+
+
+func is_ladder(cell: Vector2i) -> bool:
+	return _loader != null and _loader.ladders.has(cell)
+
+
+# --- Zbieranie ---------------------------------------------------------------
+
+func collect(item_id: String, kind: String, pos: Vector2) -> void:
+	match kind:
+		"coin":
+			var value: int = Catalog.COIN_VALUES.get(item_id, 1)
+			coins += value
+			_hud.update_coins(coins)
+			if not test_mode:
+				GameState.add_coins(value)
+			GameState.play_sfx("impact/impactGlass_light_002", -6.0, 1.6)
+		"star":
+			stars_collected += 1
+			_hud.update_stars(stars_collected, stars_total)
+			GameState.play_sfx("impact/impactBell_heavy_000", -6.0, 1.5)
+			Input.vibrate_handheld(25)
+		"powerup":
+			player.apply_powerup(item_id)
+			GameState.play_sfx("impact/impactBell_heavy_001", -4.0, 1.2)
+		"key":
+			var color: String = Catalog.get_item(item_id)["params"]["color"]
+			keys[color] = true
+			_hud.update_keys(keys)
+			unlock(color)
+	_sparkle(pos)
+
+
+func spawn_pickup(id: String, block_center: Vector2, popped: bool) -> void:
+	_loader.spawn_pickup(id, block_center, popped)
+
+
+func spawn_mob(id: String, pos: Vector2) -> void:
+	_loader.spawn_mob(id, pos)
+
+
+func unlock(color: String) -> void:
 	GameState.play_jingle(GameState.JINGLE_KEY)
-	for lock in locks:
+	for lock in get_tree().get_nodes_in_group("lock_" + color):
 		for shape in lock.find_children("*", "CollisionShape2D", false, false):
 			shape.set_deferred("disabled", true)
 		var tween: Tween = lock.create_tween()
@@ -105,88 +166,161 @@ func _on_key_collected(locks: Array) -> void:
 		tween.tween_callback(lock.queue_free)
 
 
-func _on_hazard_body_entered(body: Node) -> void:
-	if body == ball:
-		_die()
+# --- Mechanizmy ---------------------------------------------------------------
+
+func press_switch(color: String, seconds: float) -> void:
+	_switch_until[color] = Time.get_ticks_msec() / 1000.0 + seconds
+	_update_channel(color)
 
 
-func _on_checkpoint_body_entered(body: Node, checkpoint: Area2D) -> void:
-	if body != ball or _respawn_point == checkpoint.global_position + Vector2(0, -40):
-		return
-	_respawn_point = checkpoint.global_position + Vector2(0, -40)
-	var flag: AnimatedSprite2D = checkpoint.get_node("Sprite")
-	flag.play("up")
+func toggle_lever(color: String) -> void:
+	_levers[color] = not _levers.get(color, false)
+	_update_channel(color)
+
+
+func _update_channel(color: String) -> void:
+	var switched: bool = _levers.get(color, false) != _switch_until.has(color)
+	for node in get_tree().get_nodes_in_group("channel_" + color):
+		node.set_switched(switched)
+
+
+## Výbuch bomby: zničí moby a rozbitné bloky, zapáli iné bomby a zabije hráča v okruhu.
+func explode(pos: Vector2, radius: int) -> void:
+	var reach := radius * T + T / 2.0
+	GameState.play_sfx("impact/impactPunch_heavy_001", 0.0, 0.7)
+	GameState.play_sfx("impact/impactMetal_heavy_002", -4.0, 0.6)
+	Input.vibrate_handheld(120)
+	_shake = 14.0
+	_explosion_effect(pos, reach)
+	for enemy in get_tree().get_nodes_in_group("enemy"):
+		if enemy.global_position.distance_to(pos) <= reach:
+			enemy.kill()
+	for node in get_tree().get_nodes_in_group("bomb_breakable"):
+		if node.global_position.distance_to(pos) <= reach:
+			if node.has_method("explode"):
+				node.explode()
+			else:
+				break_effect(node.global_position, "brickBrown")
+				node.queue_free()
+	for bomb in get_tree().get_nodes_in_group("bomb"):
+		if bomb.global_position.distance_to(pos) <= reach:
+			bomb.ignite(0.3)
+	if player.global_position.distance_to(pos) <= reach and player.shield <= 0.0:
+		player.die()
+
+
+func break_effect(pos: Vector2, particle: String) -> void:
+	var particles := CPUParticles2D.new()
+	particles.texture = load("res://assets/remastered/%s.png" % particle)
+	particles.position = pos
+	particles.one_shot = true
+	particles.amount = 6
+	particles.lifetime = 0.9
+	particles.explosiveness = 1.0
+	particles.direction = Vector2.UP
+	particles.spread = 70.0
+	particles.gravity = Vector2(0, 1400)
+	particles.initial_velocity_min = 250.0
+	particles.initial_velocity_max = 420.0
+	particles.angular_velocity_min = -360.0
+	particles.angular_velocity_max = 360.0
+	particles.scale_amount_min = 0.5
+	particles.scale_amount_max = 0.8
+	particles.z_index = 4
+	level_root.add_child(particles)
+	particles.emitting = true
+	particles.finished.connect(particles.queue_free)
+
+
+func _explosion_effect(pos: Vector2, reach: float) -> void:
+	var particles := CPUParticles2D.new()
+	particles.texture = load(Catalog.TILES % "fireball")
+	particles.position = pos
+	particles.one_shot = true
+	particles.amount = 24
+	particles.lifetime = 0.5
+	particles.explosiveness = 1.0
+	particles.spread = 180.0
+	particles.gravity = Vector2.ZERO
+	particles.initial_velocity_min = reach * 1.2
+	particles.initial_velocity_max = reach * 2.0
+	particles.scale_amount_min = 0.6
+	particles.scale_amount_max = 1.2
+	particles.color = Color(1, 0.85, 0.6)
+	particles.z_index = 4
+	level_root.add_child(particles)
+	particles.emitting = true
+	particles.finished.connect(particles.queue_free)
+
+
+func _sparkle(pos: Vector2) -> void:
+	var particles := CPUParticles2D.new()
+	particles.position = pos
+	particles.one_shot = true
+	particles.amount = 10
+	particles.lifetime = 0.4
+	particles.explosiveness = 1.0
+	particles.spread = 180.0
+	particles.gravity = Vector2(0, 300)
+	particles.initial_velocity_min = 100.0
+	particles.initial_velocity_max = 200.0
+	particles.scale_amount_min = 3.0
+	particles.scale_amount_max = 5.0
+	particles.color = Color("ffd23f")
+	particles.z_index = 4
+	level_root.add_child(particles)
+	particles.emitting = true
+	particles.finished.connect(particles.queue_free)
+
+
+# --- Checkpoint, cieľ, smrť ---------------------------------------------------
+
+func reach_checkpoint(pos: Vector2) -> void:
+	_respawn_point = pos
 	GameState.play_jingle(GameState.JINGLE_CHECKPOINT)
 
 
-func _on_finish_body_entered(body: Node, finish: Area2D) -> void:
-	if body != ball or not running or _dead:
+func reach_exit(exit_node: Node2D) -> void:
+	if not running or player.dead:
 		return
 	running = false
-	ball.input_enabled = false
-	# Gulička sa vkotúľa do dverí a zmizne.
-	ball.set_deferred("freeze", true)
-	var door_center := finish.global_position + Vector2(0, -40)
-	var tween := create_tween().set_parallel()
-	tween.tween_property(ball, "global_position", door_center, 0.35).set_ease(Tween.EASE_IN)
-	tween.tween_property(ball.visual, "scale", Vector2.ZERO, 0.4).set_delay(0.15)
+	player.input_enabled = false
+	player.velocity = Vector2.ZERO
+	player.celebrate()
+	var tween := create_tween()
+	tween.tween_property(player, "global_position:x", exit_node.global_position.x, 0.25)
+	tween.tween_property(player, "modulate:a", 0.0, 0.4)
 	GameState.stop_music()
 	GameState.play_jingle(GameState.JINGLE_COMPLETE)
-	GameState.record_stars(level, stars_collected)
+	if not test_mode:
+		GameState.record_stars(world["id"], level["id"], stars_collected)
 	await get_tree().create_timer(1.0).timeout
-	GameState.maybe_show_interstitial()
-	_hud.show_level_complete(stars_collected, stars_total, elapsed, GameState.has_level(level + 1))
+	var next := {} if test_mode else Content.next_level(world["id"], level["id"])
+	if not test_mode:
+		GameState.maybe_show_interstitial()
+	_hud.show_level_complete(stars_collected, stars_total, coins, elapsed, not next.is_empty(), test_mode)
 
 
-func _on_ball_landed(impact_speed: float) -> void:
-	if impact_speed < 250.0:
-		return
-	var strength := inverse_lerp(250.0, 850.0, impact_speed)
-	ball.visual.squash(strength)
-	GameState.play_sfx("impactSoft_medium_000", lerpf(-14.0, 0.0, strength), randf_range(0.9, 1.1))
-	if strength > 0.55:
-		_shake = 8.0 * strength
-		Input.vibrate_handheld(15)
-
-
-func _on_ball_jumped() -> void:
-	ball.visual.stretch()
-
-
-# --- Smrť a návrat --------------------------------------------------------
-
-func _die() -> void:
-	if _dead or not running:
-		return
-	_dead = true
-	GameState.play_sfx("impactPunch_heavy_000", -4.0)
+func _on_player_died() -> void:
 	GameState.play_jingle(GameState.JINGLE_DEATH)
-	Input.vibrate_handheld(60)
-	_shake = 12.0
-	ball.input_enabled = false
-	ball.set_deferred("freeze", true)
-	var tween := create_tween()
-	tween.tween_property(ball.visual, "scale", Vector2(1.6, 0.2), 0.12)
-	tween.tween_callback(func(): ball.visible = false)
-	GameState.lose_life()
-	await get_tree().create_timer(0.9).timeout
-
-	if GameState.lives > 0:
+	_shake = 10.0
+	if not test_mode:
+		GameState.lose_life()
+	await get_tree().create_timer(1.2).timeout
+	if test_mode or GameState.lives > 0:
 		_respawn()
 	else:
 		_hud.show_out_of_lives()
 
 
 func _respawn() -> void:
-	ball.visual.scale = Vector2.ONE
-	ball.global_position = _respawn_point
-	ball.respawn(_respawn_point)
+	player.modulate.a = 1.0
+	player.respawn(_respawn_point)
 	camera.global_position = _respawn_point
 	camera.reset_smoothing()
-	_dead = false
 
 
-## Volá HUD, keď si hráč pozrie reklamu a dostane život.
+## Volá HUD po reklame za život.
 func continue_after_ad() -> void:
 	_respawn()
 
@@ -198,10 +332,18 @@ func restart_level() -> void:
 
 func next_level() -> void:
 	get_tree().paused = false
-	GameState.current_level = level + 1
+	var next := Content.next_level(world["id"], level["id"])
+	if next.is_empty():
+		go_to_menu()
+		return
+	GameState.current_level_id = next["id"]
 	get_tree().reload_current_scene()
 
 
 func go_to_menu() -> void:
 	get_tree().paused = false
-	get_tree().change_scene_to_file("res://scenes/menu.tscn")
+	GameState.stop_music()
+	if test_mode:
+		get_tree().change_scene_to_file("res://scenes/editor.tscn")
+	else:
+		get_tree().change_scene_to_file("res://scenes/menu.tscn")

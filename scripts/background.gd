@@ -1,10 +1,10 @@
 extends CanvasLayer
-## Pozadie z Kenney New Platformer Pack: nebo, pás oblakov a pás kopcov.
+## Pozadie z Kenney New Platformer Pack: nebo, pás oblakov a pás kopcov/stromov/púšte/húb.
 ## Vrstvy sa posúvajú pomalšie ako kamera (paralaxa), oblaky sa pomaly hýbu samy.
 
-const TEX_SKY := preload("res://assets/backgrounds/background_solid_sky.png")
-const TEX_CLOUDS := preload("res://assets/backgrounds/background_clouds.png")
-const TEX_HILLS := preload("res://assets/backgrounds/background_fade_hills.png")
+const TEX_SKY := preload("res://assets/npp/backgrounds/background_solid_sky.png")
+const TEX_CLOUDS := preload("res://assets/npp/backgrounds/background_clouds.png")
+const BAND := "res://assets/npp/backgrounds/background_fade_%s.png"
 const DESIGN_HEIGHT := 720.0
 const BAND_HEIGHT := 300.0  ## výška pásu oblakov a kopcov pri výške obrazovky 720
 const CLOUDS_TOP := 60.0
@@ -13,6 +13,7 @@ const CLOUD_PARALLAX := 0.05
 const HILLS_PARALLAX := 0.2
 
 var camera: Camera2D  ## ak je prázdne, pozadie sa hýbe len samé (menu)
+var style := "hills"  ## hills, trees, desert, mushrooms
 
 var _sky: TextureRect
 var _clouds: Sprite2D
@@ -29,7 +30,7 @@ func _ready() -> void:
 	_sky.stretch_mode = TextureRect.STRETCH_SCALE
 	add_child(_sky)
 	_clouds = _band(TEX_CLOUDS)
-	_hills = _band(TEX_HILLS)
+	_hills = _band(load(BAND % style))
 
 
 func _band(texture: Texture2D) -> Sprite2D:

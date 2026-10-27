@@ -1,12 +1,14 @@
 extends Node
-## Globálny stav hry (autoload "GameState"): životy, najlepšie hviezdy, ukladanie, zvuky.
+## Globálny stav hry (autoload "GameState"): životy, mince, najlepšie hviezdy,
+## vybraná postavička, ukladanie, hudba a zvuky.
 
 signal lives_changed(lives: int)
+signal coins_changed(coins: int)
 
 const MAX_LIVES := 10
 const LIFE_REGEN_SECONDS := 30 * 60
 const SAVE_PATH := "user://save.cfg"
-const LEVEL_COUNT := 3
+const COINS_PER_LIFE := 100
 
 ## Krátke melódie z Kenney Music Jingles (assets/sfx/jingles). Vypočuj si ich a vymeň podľa chuti.
 const JINGLE_COMPLETE := "jingles/jingles_PIZZI07"
@@ -18,13 +20,34 @@ const JINGLE_NO_LIVES := "jingles/jingles_PIZZI12"
 ## Hudba na pozadí (assets/music). Skladby sa striedajú v náhodnom poradí.
 const MENU_PLAYLIST := ["musicbox2_cute_tune"]
 const LEVEL_PLAYLIST := ["happy_clappy", "other_center", "swinging_sweet", "just_saying_tho", "musicbox4_happy_polka"]
+## Názvy skladieb pre výber hudby sveta v editore ("" = všetky striedavo).
+const TRACK_NAMES := {
+	"": "Všetky striedavo",
+	"happy_clappy": "Happy Clappy",
+	"other_center": "Other Center",
+	"swinging_sweet": "Swinging Sweet",
+	"just_saying_tho": "Just Saying Tho",
+	"musicbox4_happy_polka": "Happy Polka",
+	"musicbox2_cute_tune": "Cute Tune",
+}
 const TRACK_MIN_SECONDS := 90.0  ## krátka slučka sa opakuje, kým neuplynie tento čas
 const MUSIC_DB := -9.0
 const SILENT_DB := -40.0
 
 var lives := MAX_LIVES
-var best_stars := {}  # číslo levelu -> najviac zozbieraných hviezd (0 – 3)
-var current_level := 1
+var coins := 0
+var best_stars := {}  # "svet/level" -> najviac zozbieraných hviezd (0 – 3)
+var character := "red_circle"
+var current_world_id := ""
+var current_level_id := ""
+
+## Testovanie z editora: level a svet, ktorý sa práve skúša (inak prázdne).
+var test_level := {}
+var test_world := {}
+## Editor si sem odloží, čo práve upravuje, aby sa po teste vrátil na to isté miesto.
+var editor_world_id := ""
+var editor_level_id := ""
+var editor_draft := {}
 
 ## Unix čas, od ktorého sa odpočítava ďalší život. Platí len keď lives < MAX_LIVES.
 var _regen_start := 0
@@ -113,6 +136,11 @@ func play_jingle(jingle: String) -> void:
 	play_sfx(jingle, -2.0)
 
 
+func playlist_for(world: Dictionary) -> Array:
+	var track: String = world.get("music", "")
+	return [track] if track != "" else LEVEL_PLAYLIST
+
+
 # --- Životy ---------------------------------------------------------------
 
 func lose_life() -> void:
@@ -150,23 +178,47 @@ func _update_regen() -> void:
 	lives_changed.emit(lives)
 
 
+func add_coins(amount: int) -> void:
+	var before := coins / COINS_PER_LIFE
+	coins += amount
+	if coins / COINS_PER_LIFE > before:
+		add_life()
+		play_jingle(JINGLE_CHECKPOINT)
+	_save()
+	coins_changed.emit(coins)
+
+
 static func format_time(seconds: int) -> String:
 	return "%d:%02d" % [seconds / 60, seconds % 60]
 
 
 # --- Levely ---------------------------------------------------------------
 
-func record_stars(level: int, stars: int) -> void:
-	best_stars[level] = maxi(stars, int(best_stars.get(level, 0)))
+func record_stars(world_id: String, level_id: String, stars: int) -> void:
+	var key := world_id + "/" + level_id
+	best_stars[key] = maxi(stars, int(best_stars.get(key, 0)))
 	_save()
 
 
-func is_unlocked(level: int) -> bool:
-	return level == 1 or best_stars.has(level - 1)
+func stars_for(world_id: String, level_id: String) -> int:
+	return int(best_stars.get(world_id + "/" + level_id, 0))
 
 
-func has_level(level: int) -> bool:
-	return level >= 1 and level <= LEVEL_COUNT
+func is_completed(world_id: String, level_id: String) -> bool:
+	return best_stars.has(world_id + "/" + level_id)
+
+
+## Level je odomknutý, ak je prvý vo svete alebo je predchádzajúci dokončený.
+func is_unlocked(world: Dictionary, index: int) -> bool:
+	if index == 0:
+		return true
+	var previous: Dictionary = world["levels"][index - 1]
+	return is_completed(world["id"], previous["id"])
+
+
+func set_character(color: String) -> void:
+	character = color
+	_save()
 
 
 # --- Reklamy (zatiaľ len atrapa) -----------------------------------------
@@ -203,7 +255,9 @@ func play_sfx(sound: String, volume_db := 0.0, pitch := 1.0) -> void:
 func _setup_input() -> void:
 	_add_action("move_left", [KEY_LEFT, KEY_A])
 	_add_action("move_right", [KEY_RIGHT, KEY_D])
-	_add_action("jump", [KEY_SPACE, KEY_UP, KEY_W])
+	_add_action("move_up", [KEY_UP, KEY_W])
+	_add_action("move_down", [KEY_DOWN, KEY_S])
+	_add_action("jump", [KEY_SPACE, KEY_Z, KEY_J])
 	_add_action("pause", [KEY_ESCAPE, KEY_P])
 
 
@@ -224,6 +278,8 @@ func _save() -> void:
 	config.set_value("player", "lives", lives)
 	config.set_value("player", "regen_start", _regen_start)
 	config.set_value("player", "best_stars", best_stars)
+	config.set_value("player", "coins", coins)
+	config.set_value("player", "character", character)
 	config.set_value("settings", "music", music_enabled)
 	config.save(SAVE_PATH)
 
@@ -235,6 +291,14 @@ func _load() -> void:
 	lives = config.get_value("player", "lives", MAX_LIVES)
 	_regen_start = config.get_value("player", "regen_start", _now())
 	best_stars = config.get_value("player", "best_stars", {})
+	coins = config.get_value("player", "coins", 0)
+	character = config.get_value("player", "character", "red_circle")
+	if not String(character).contains("_"):
+		character = "red_circle"
+	# Staré uloženie (číslo levelu namiesto "svet/level") nepoužijeme.
+	for key in best_stars.keys():
+		if not String(str(key)).contains("/"):
+			best_stars.erase(key)
 	music_enabled = config.get_value("settings", "music", true)
 
 
