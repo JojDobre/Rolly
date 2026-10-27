@@ -8,7 +8,7 @@ config/name="Gulicka"
 config/description="Fyzikálna plošinovka s guličkou, ktorá zbiera hviezdy."
 run/main_scene="res://scenes/menu.tscn"
 config/features=PackedStringArray("4.4", "GL Compatibility")
-config/icon="res://assets/ui/ball_icon.png"
+config/icon="res://assets/objects/star.png"
 
 [autoload]
 

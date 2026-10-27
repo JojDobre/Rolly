@@ -1,8 +1,8 @@
 """Vykreslí náhľad všetkých levelov do levels_preview.png (približne ako v hre).
 
 Spustenie:  python3 tools/preview_levels.py   (potrebuje Pillow)
+Výber dlaždíc kopíruje logiku zo scripts/level_builder.gd.
 """
-import math
 import re
 from pathlib import Path
 
@@ -11,103 +11,96 @@ from PIL import Image, ImageDraw
 ROOT = Path(__file__).resolve().parent.parent
 A = ROOT / "assets"
 T = 64
-OUTLINE = (38, 62, 20, 255)
-GRASS = (126, 198, 54, 255)
+DECORATIONS = {"g": "grass", "u": "bush", "m": "mushroom_red", "o": "rock", ">": "sign_right"}
+_cache = {}
 
 
-def load(p):
-    return Image.open(A / p).convert("RGBA")
+def tex(path):
+    if path not in _cache:
+        _cache[path] = Image.open(A / path).convert("RGBA")
+    return _cache[path]
 
 
-dirt, grass = load("world/dirt.png"), load("world/grass_top.png")
-clouds, far, near = load("world/clouds.png"), load("world/hills_far.png"), load("world/hills_near.png")
-spikes, star, key, lock = load("objects/spikesLow.png"), load("items/starGold.png"), load("objects/keyRed.png"), load("objects/blockRed_lock.png")
-flag_red, flag_green = load("objects/flagRed_down.png"), load("objects/flagGreen_down.png")
-arrow, crate, ball = load("objects/signArrow_right.png"), load("objects/crate_wood.png"), load("ui/ball_icon.png")
+def tile(name):
+    return tex(f"tiles/terrain_grass_{name}.png")
 
 
-def tiled(tex, w, h, ox=0, oy=0):
-    out = Image.new("RGBA", (w, h))
-    for x in range(-(ox % tex.width), w, tex.width):
-        for y in range(-(oy % tex.height), h, tex.height):
-            out.alpha_composite(tex, (x, y)) if x >= 0 and y >= 0 else out.paste(tex, (x, y), tex)
-    return out
+def obj(name):
+    return tex(f"objects/{name}.png")
 
 
 def render(rows):
-    W, H = len(rows[0]) * T, len(rows) * T
+    cols, height = len(rows[0]), len(rows)
+    W, H = cols * T, height * T
+    cell = lambda x, y: rows[y][x] if 0 <= y < height and 0 <= x < cols else ""
+
+    def ground(x, y, edge):
+        if x < 0 or x >= cols or y >= height:
+            return edge
+        return y >= 0 and cell(x, y) in ("#", "/")
+
+    def ground_tile(x, y):
+        up, down = ground(x, y - 1, False), ground(x, y + 1, True)
+        left, right = ground(x - 1, y, True), ground(x + 1, y, True)
+        if not left and not right:
+            if not up and not down: return "block"
+            if not up: return "vertical_top"
+            return "vertical_bottom" if not down else "vertical_middle"
+        if not up and not down:
+            if not left: return "horizontal_left"
+            return "horizontal_right" if not right else "horizontal_middle"
+        row = "top" if not up else ("bottom" if not down else "")
+        col = "left" if not left else ("right" if not right else "")
+        if not row and not col: return "block_center"
+        if not row or not col: return "block_" + row + col
+        return f"block_{row}_{col}"
+
     im = Image.new("RGBA", (W, H))
-    d = ImageDraw.Draw(im)
-    for y in range(H):
-        t = y / H
-        d.line([(0, y), (W, y)], fill=(int(120 + 95 * t), int(200 + 40 * t), int(240 + 10 * t), 255))
-    k = H / 720
-    for tex, top, extra in ((clouds, 30, 0), (far, None, 0), (near, None, -60)):
-        t2 = tex.resize((int(tex.width * k), int(tex.height * k)))
-        y = int(top * k) if top is not None else int(H - (tex.height + extra) * k)
-        for x in range(0, W, t2.width):
-            im.alpha_composite(t2, (x, 0) if False else (x, max(0, y)))
-    cell = lambda x, y: rows[y][x] if 0 <= y < len(rows) and 0 <= x < len(rows[0]) else ""
-    solid = lambda x, y: cell(x, y) in ("#", "/")
-    dirt_full = tiled(dirt, W, H)
-    mask = Image.new("L", (W, H), 0)
-    md = ImageDraw.Draw(mask)
-    for y, r in enumerate(rows):
-        for x, c in enumerate(r):
-            if c == "#":
-                md.rectangle([x * T, y * T, x * T + T - 1, y * T + T - 1], fill=255)
-            elif c == "=":
-                md.rectangle([x * T, y * T, x * T + T - 1, y * T + 49], fill=255)
-            elif c == "/":
-                rising = cell(x + 1, y) == "#" or not solid(x - 1, y)
-                pts = [(x * T, (y + 1) * T), ((x + 1) * T, y * T), ((x + 1) * T, (y + 1) * T)] if rising else \
-                      [(x * T, y * T), ((x + 1) * T, (y + 1) * T), (x * T, (y + 1) * T)]
-                md.polygon(pts, fill=255)
-    im.paste(dirt_full, (0, 0), mask)
-    d = ImageDraw.Draw(im)
-    for y, r in enumerate(rows):
-        for x, c in enumerate(r):
-            L, R, Tp = x * T, (x + 1) * T, y * T
-            if c == "#":
-                if not solid(x - 1, y): d.line([(L, Tp), (L, Tp + T)], fill=OUTLINE, width=5)
-                if not solid(x + 1, y): d.line([(R, Tp), (R, Tp + T)], fill=OUTLINE, width=5)
-                if not solid(x, y + 1): d.line([(L, Tp + T), (R, Tp + T)], fill=OUTLINE, width=5)
-            if c == "=":
-                d.line([(L, Tp + 50), (R, Tp + 50)], fill=OUTLINE, width=5)
-                if cell(x - 1, y) != "=": d.line([(L, Tp), (L, Tp + 50)], fill=OUTLINE, width=5)
-                if cell(x + 1, y) != "=": d.line([(R, Tp), (R, Tp + 50)], fill=OUTLINE, width=5)
-    for y, r in enumerate(rows):
-        for x, c in enumerate(r):
-            L, Tp = x * T, y * T
-            if (c == "#" and not solid(x, y - 1)) or (c == "=" and cell(x, y - 1) != "="):
-                im.alpha_composite(grass.crop(((L % 256), 0, (L % 256) + T, grass.height)), (L, Tp - 12))
-                flat = "=" if c == "=" else "#/"
-                for side, cx in ((-1, L), (1, L + T)):
-                    if cell(x + side, y) == "" or cell(x + side, y) not in flat:
-                        d.ellipse([cx - 15, Tp - 7, cx + 15, Tp + 23], fill=OUTLINE)
-                        d.ellipse([cx - 11, Tp - 3, cx + 11, Tp + 19], fill=GRASS)
-            elif c == "/":
-                rising = cell(x + 1, y) == "#" or not solid(x - 1, y)
-                L2 = int(T * math.sqrt(2))
-                strip = grass.crop((0, 0, L2, grass.height)).rotate(45 if rising else -45, expand=True, resample=Image.BICUBIC)
-                sx, sy = (L, (y + 1) * T) if rising else (L, Tp)
-                im.alpha_composite(strip, (sx - (0 if rising else 8), (sy - strip.height + 8) if rising else (sy - 8)))
-    def put(img, cx, cy, s=1.0):
-        if s != 1.0: img = img.resize((int(img.width * s), int(img.height * s)))
+    band = int(300 * H / 720)
+    sky, clouds, hills = tex("backgrounds/background_solid_sky.png"), tex("backgrounds/background_clouds.png"), tex("backgrounds/background_fade_hills.png")
+    im.paste(sky.resize((W, H)), (0, 0))
+    top = int(60 * H / 720)
+    for img, y in ((clouds, top), (hills, top + band)):
+        strip = img.resize((band, band))
+        for x in range(0, W, band):
+            im.alpha_composite(strip, (x, y))
+
+    def put(img, cx, cy, scale=1.0, flip=False):
+        if scale != 1.0:
+            img = img.resize((int(img.width * scale), int(img.height * scale)))
+        if flip:
+            img = img.transpose(Image.FLIP_LEFT_RIGHT)
         im.alpha_composite(img, (int(cx - img.width / 2), int(cy - img.height / 2)))
+
     for y, r in enumerate(rows):
         for x, c in enumerate(r):
             cx, cy, by = x * T + 32, y * T + 32, (y + 1) * T
-            if c == "^": put(spikes, cx, by - 13)
-            elif c == "*": put(star, cx, cy, 0.75)
-            elif c == "K": put(key, cx, cy, 1.5)
-            elif c == "L": put(lock, cx, cy)
-            elif c in "CF":
-                f = (flag_green if c == "C" else flag_red).resize((24, 98))
-                im.alpha_composite(f, (cx - 12, by - 98))
-            elif c in "BM": put(crate, cx, by - 34, 68 / 70)
-            elif c == ">": im.alpha_composite(arrow, (cx - 24, by - 55))
-            elif c == "P": put(ball.resize((52, 52)), cx, by - 26)
+            if c in DECORATIONS: put(obj(DECORATIONS[c]), cx, cy)
+            elif c == "F":
+                put(obj("door_open"), cx, cy)
+                put(obj("door_open_top"), cx, cy - T)
+    for y, r in enumerate(rows):
+        for x, c in enumerate(r):
+            cx, cy = x * T + 32, y * T + 32
+            if c == "#": put(tile(ground_tile(x, y)), cx, cy)
+            elif c == "=":
+                left, right = cell(x - 1, y) == "=", cell(x + 1, y) == "="
+                name = "cloud_middle" if left and right else "cloud_left" if right else "cloud_right" if left else "cloud"
+                put(tile(name), cx, cy)
+            elif c == "/":
+                rising = cell(x + 1, y) == "#" or cell(x - 1, y) not in ("#", "/")
+                put(tile("ramp_short_b"), cx, cy, flip=rising)
+            elif c == "^": put(obj("spikes"), cx, cy)
+            elif c == "*": put(obj("star"), cx, cy, 1.1)
+            elif c == "K": put(obj("key_red"), cx, cy)
+            elif c == "L": put(obj("lock_red"), cx, cy)
+            elif c == "C": put(obj("flag_off"), cx + 20, cy - 16, 1.5)
+            elif c == "B": put(obj("block_planks"), cx, (y + 1) * T - 34, 68 / 64)
+            elif c == "M": put(obj("block_strong_empty"), cx, (y + 1) * T - 34, 68 / 64)
+            elif c == "P":
+                d = ImageDraw.Draw(im)
+                d.ellipse([cx - 26, (y + 1) * T - 52, cx + 26, (y + 1) * T], fill=(140, 22, 18), outline=None)
+                d.ellipse([cx - 23, (y + 1) * T - 49, cx + 23, (y + 1) * T - 3], fill=(226, 57, 47))
     return im
 
 

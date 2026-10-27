@@ -2,12 +2,16 @@ extends CanvasLayer
 ## Herné rozhranie: hviezdy, čas, životy, pauza, dotykové ovládanie a panely po leveli.
 
 const UI := preload("res://scripts/ui_theme.gd")
-const TEX_STAR := preload("res://assets/items/starGold.png")
-const TEX_STAR_EMPTY := preload("res://assets/items/starSilver.png")
-const TEX_LIFE := preload("res://assets/ui/ball_icon.png")
-const TEX_LEFT := preload("res://assets/ui/touch_left.png")
-const TEX_RIGHT := preload("res://assets/ui/touch_right.png")
-const TEX_JUMP := preload("res://assets/ui/touch_jump.png")
+const TEX_STAR := preload("res://assets/objects/star.png")
+const TEX_LIFE := preload("res://assets/objects/hud_heart.png")
+const TEX_LEFT := preload("res://assets/controls/direction_left.png")
+const TEX_RIGHT := preload("res://assets/controls/direction_right.png")
+const TEX_BUTTON := preload("res://assets/controls/button_circle.png")
+const TEX_BUTTON_SQUARE := preload("res://assets/controls/button_square.png")
+const TEX_ICON_JUMP := preload("res://assets/controls/icon_jump.png")
+const TEX_ICON_PAUSE := preload("res://assets/controls/icon_pause.png")
+const STAR_DIM := Color(0.15, 0.2, 0.3, 0.45)
+const TOUCH_SIZE := 128.0
 
 var game  # game.gd
 
@@ -77,10 +81,15 @@ func _build_top_bar() -> void:
 	_lives_label = _hud_label("× 10", 34)
 	bar.add_child(_lives_label)
 
-	var pause := Button.new()
-	pause.text = "II"
-	pause.custom_minimum_size = Vector2(72, 64)
+	var pause := TextureButton.new()
+	pause.texture_normal = TEX_BUTTON_SQUARE
+	pause.ignore_texture_size = true
+	pause.stretch_mode = TextureButton.STRETCH_SCALE
+	pause.custom_minimum_size = Vector2(72, 72)
 	pause.pressed.connect(toggle_pause)
+	var pause_icon := _icon(TEX_ICON_PAUSE, 40)
+	pause_icon.position = Vector2(16, 16)
+	pause.add_child(pause_icon)
 	bar.add_child(pause)
 
 	_title_label = _hud_label("", 44)
@@ -104,15 +113,18 @@ func update_stars(collected: int, total: int) -> void:
 			_stars_box.remove_child(child)
 			child.queue_free()
 		for i in total:
-			_stars_box.add_child(_icon(TEX_STAR_EMPTY, 46))
+			var empty := _icon(TEX_STAR, 56)
+			empty.self_modulate = STAR_DIM
+			_stars_box.add_child(empty)
 	for i in total:
 		var icon: TextureRect = _stars_box.get_child(i)
 		var lit := i < collected
-		if lit and icon.texture != TEX_STAR:
-			icon.pivot_offset = Vector2(23, 23)
+		if lit and not icon.get_meta("lit", false):
+			icon.pivot_offset = Vector2(28, 28)
 			icon.scale = Vector2(1.6, 1.6)
 			create_tween().tween_property(icon, "scale", Vector2.ONE, 0.3).set_trans(Tween.TRANS_BACK)
-		icon.texture = TEX_STAR if lit else TEX_STAR_EMPTY
+		icon.set_meta("lit", lit)
+		icon.self_modulate = Color.WHITE if lit else STAR_DIM
 
 
 func update_time(seconds: float) -> void:
@@ -126,18 +138,25 @@ func _on_lives_changed(lives: int) -> void:
 # --- Dotykové ovládanie ---------------------------------------------------
 
 func _build_touch_controls() -> void:
-	for spec in [[TEX_LEFT, "move_left"], [TEX_RIGHT, "move_right"], [TEX_JUMP, "jump"]]:
+	for spec in [[TEX_LEFT, null, "move_left"], [TEX_RIGHT, null, "move_right"], [TEX_BUTTON, TEX_ICON_JUMP, "jump"]]:
 		var button := TouchScreenButton.new()
 		button.texture_normal = spec[0]
-		button.action = spec[1]
+		button.action = spec[2]
 		button.passby_press = true
 		button.visibility_mode = TouchScreenButton.VISIBILITY_TOUCHSCREEN_ONLY
 		var circle := CircleShape2D.new()
-		circle.radius = 70.0
+		circle.radius = TOUCH_SIZE * 0.55
 		button.shape = circle
 		button.shape_centered = true
-		button.pressed.connect(func(): button.modulate = Color(1, 1, 1, 0.6))
-		button.released.connect(func(): button.modulate = Color.WHITE)
+		button.modulate = Color(1, 1, 1, 0.85)
+		if spec[1]:
+			var icon := Sprite2D.new()
+			icon.texture = spec[1]
+			icon.position = Vector2(TOUCH_SIZE, TOUCH_SIZE) / 2.0
+			icon.scale = Vector2(0.6, 0.6)
+			button.add_child(icon)
+		button.pressed.connect(func(): button.modulate = Color(1, 1, 1, 0.55))
+		button.released.connect(func(): button.modulate = Color(1, 1, 1, 0.85))
 		add_child(button)
 		_touch_buttons.append(button)
 	get_viewport().size_changed.connect(_place_touch_controls)
@@ -146,9 +165,10 @@ func _build_touch_controls() -> void:
 
 func _place_touch_controls() -> void:
 	var size := get_viewport().get_visible_rect().size
-	_touch_buttons[0].position = Vector2(40, size.y - 170)
-	_touch_buttons[1].position = Vector2(200, size.y - 170)
-	_touch_buttons[2].position = Vector2(size.x - 170, size.y - 170)
+	var y := size.y - TOUCH_SIZE - 36.0
+	_touch_buttons[0].position = Vector2(36, y)
+	_touch_buttons[1].position = Vector2(36 + TOUCH_SIZE + 24, y)
+	_touch_buttons[2].position = Vector2(size.x - TOUCH_SIZE - 36, y)
 
 
 func _set_touch_visible(on: bool) -> void:
@@ -177,7 +197,8 @@ func show_level_complete(stars: int, total: int, seconds: float, has_next: bool)
 	row.add_theme_constant_override("separation", 16)
 	var icons := []
 	for i in total:
-		var icon := _icon(TEX_STAR_EMPTY, 84)
+		var icon := _icon(TEX_STAR, 110)
+		icon.self_modulate = STAR_DIM
 		row.add_child(icon)
 		icons.append(icon)
 	var time_label := Label.new()
@@ -197,7 +218,7 @@ func show_level_complete(stars: int, total: int, seconds: float, has_next: bool)
 		var icon: TextureRect = icons[i]
 		tween.tween_interval(0.25)
 		tween.tween_callback(func():
-			icon.texture = TEX_STAR
+			icon.self_modulate = Color.WHITE
 			icon.pivot_offset = icon.size / 2.0
 			icon.scale = Vector2(1.5, 1.5)
 			create_tween().tween_property(icon, "scale", Vector2.ONE, 0.3).set_trans(Tween.TRANS_BACK)
@@ -205,6 +226,7 @@ func show_level_complete(stars: int, total: int, seconds: float, has_next: bool)
 
 
 func show_out_of_lives() -> void:
+	GameState.play_jingle(GameState.JINGLE_NO_LIVES)
 	_countdown_label = Label.new()
 	_countdown_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var info := Label.new()

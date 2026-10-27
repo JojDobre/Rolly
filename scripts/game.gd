@@ -4,8 +4,6 @@ extends Node2D
 const BUILDER := preload("res://scripts/level_builder.gd")
 const HUD := preload("res://scripts/hud.gd")
 const BACKGROUND := preload("res://scripts/background.gd")
-const TEX_FLAG_RED_UP := preload("res://assets/objects/flagRed_up.png")
-const TEX_FLAG_GREEN_UP := preload("res://assets/objects/flagGreen_up.png")
 const BALL := preload("res://scripts/ball.gd")
 const FALL_MARGIN := 300.0
 const T_EXTRA := 256  ## koľko je kamera ochotná ukázať nad levelom
@@ -70,6 +68,7 @@ func _ready() -> void:
 	add_child(_hud)
 	_hud.set_level_title(level, data.TITLE)
 	_hud.update_stars(stars_collected, stars_total)
+	GameState.play_music(GameState.LEVEL_PLAYLIST)
 
 
 func _process(delta: float) -> void:
@@ -96,6 +95,7 @@ func _on_star_collected() -> void:
 
 
 func _on_key_collected(locks: Array) -> void:
+	GameState.play_jingle(GameState.JINGLE_KEY)
 	for lock in locks:
 		for shape in lock.find_children("*", "CollisionShape2D", false, false):
 			shape.set_deferred("disabled", true)
@@ -114,9 +114,9 @@ func _on_checkpoint_body_entered(body: Node, checkpoint: Area2D) -> void:
 	if body != ball or _respawn_point == checkpoint.global_position + Vector2(0, -40):
 		return
 	_respawn_point = checkpoint.global_position + Vector2(0, -40)
-	var sprite: Sprite2D = checkpoint.get_node("Sprite")
-	sprite.texture = TEX_FLAG_GREEN_UP
-	GameState.play_sfx("impactBell_heavy_000", -8.0, 1.4)
+	var flag: AnimatedSprite2D = checkpoint.get_node("Sprite")
+	flag.play("up")
+	GameState.play_jingle(GameState.JINGLE_CHECKPOINT)
 
 
 func _on_finish_body_entered(body: Node, finish: Area2D) -> void:
@@ -124,11 +124,16 @@ func _on_finish_body_entered(body: Node, finish: Area2D) -> void:
 		return
 	running = false
 	ball.input_enabled = false
-	var sprite: Sprite2D = finish.get_node("Sprite")
-	sprite.texture = TEX_FLAG_RED_UP
-	GameState.play_sfx("impactBell_heavy_000")
+	# Gulička sa vkotúľa do dverí a zmizne.
+	ball.set_deferred("freeze", true)
+	var door_center := finish.global_position + Vector2(0, -40)
+	var tween := create_tween().set_parallel()
+	tween.tween_property(ball, "global_position", door_center, 0.35).set_ease(Tween.EASE_IN)
+	tween.tween_property(ball.visual, "scale", Vector2.ZERO, 0.4).set_delay(0.15)
+	GameState.stop_music()
+	GameState.play_jingle(GameState.JINGLE_COMPLETE)
 	GameState.record_stars(level, stars_collected)
-	await get_tree().create_timer(0.8).timeout
+	await get_tree().create_timer(1.0).timeout
 	GameState.maybe_show_interstitial()
 	_hud.show_level_complete(stars_collected, stars_total, elapsed, GameState.has_level(level + 1))
 
@@ -155,6 +160,7 @@ func _die() -> void:
 		return
 	_dead = true
 	GameState.play_sfx("impactPunch_heavy_000", -4.0)
+	GameState.play_jingle(GameState.JINGLE_DEATH)
 	Input.vibrate_handheld(60)
 	_shake = 12.0
 	ball.input_enabled = false

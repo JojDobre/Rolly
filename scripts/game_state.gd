@@ -8,6 +8,20 @@ const LIFE_REGEN_SECONDS := 30 * 60
 const SAVE_PATH := "user://save.cfg"
 const LEVEL_COUNT := 3
 
+## Krátke melódie z Kenney Music Jingles (assets/sfx/jingles). Vypočuj si ich a vymeň podľa chuti.
+const JINGLE_COMPLETE := "jingles/jingles_PIZZI07"
+const JINGLE_CHECKPOINT := "jingles/jingles_PIZZI01"
+const JINGLE_KEY := "jingles/jingles_PIZZI03"
+const JINGLE_DEATH := "jingles/jingles_PIZZI16"
+const JINGLE_NO_LIVES := "jingles/jingles_PIZZI12"
+
+## Hudba na pozadí (assets/music). Skladby sa striedajú v náhodnom poradí.
+const MENU_PLAYLIST := ["musicbox2_cute_tune"]
+const LEVEL_PLAYLIST := ["happy_clappy", "other_center", "swinging_sweet", "just_saying_tho", "musicbox4_happy_polka"]
+const TRACK_MIN_SECONDS := 90.0  ## krátka slučka sa opakuje, kým neuplynie tento čas
+const MUSIC_DB := -9.0
+const SILENT_DB := -40.0
+
 var lives := MAX_LIVES
 var best_stars := {}  # číslo levelu -> najviac zozbieraných hviezd (0 – 3)
 var current_level := 1
@@ -15,6 +29,13 @@ var current_level := 1
 ## Unix čas, od ktorého sa odpočítava ďalší život. Platí len keď lives < MAX_LIVES.
 var _regen_start := 0
 var _sfx_cache := {}
+var music_enabled := true
+var _music: AudioStreamPlayer
+var _playlist: Array = []
+var _track_index := 0
+var _track_time := 0.0
+var _switching := false
+var _fade: Tween
 
 
 func _ready() -> void:
@@ -27,6 +48,69 @@ func _ready() -> void:
 	timer.autostart = true
 	timer.timeout.connect(_update_regen)
 	add_child(timer)
+	_music = AudioStreamPlayer.new()
+	_music.volume_db = SILENT_DB
+	add_child(_music)
+
+
+func _process(delta: float) -> void:
+	if not _music.playing or _switching or _playlist.size() < 2:
+		return
+	_track_time += delta
+	if _track_time >= maxf(TRACK_MIN_SECONDS, _music.stream.get_length()):
+		_switching = true
+		var tween := create_tween()
+		tween.tween_property(_music, "volume_db", SILENT_DB, 1.5)
+		tween.tween_callback(func():
+			_track_index = (_track_index + 1) % _playlist.size()
+			_start_track())
+
+
+# --- Hudba ----------------------------------------------------------------
+
+func play_music(playlist: Array) -> void:
+	if playlist == _playlist and _music.playing:
+		return
+	_playlist = playlist
+	_track_index = randi() % playlist.size()
+	_start_track()
+
+
+func stop_music() -> void:
+	_playlist = []
+	_fade = create_tween()
+	_fade.tween_property(_music, "volume_db", SILENT_DB, 0.6)
+	_fade.tween_callback(_music.stop)
+
+
+func set_music_enabled(on: bool) -> void:
+	music_enabled = on
+	_save()
+	if on:
+		_start_track()
+	else:
+		_music.stop()
+
+
+func _start_track() -> void:
+	if _fade:
+		_fade.kill()
+	_switching = false
+	_track_time = 0.0
+	if not music_enabled or _playlist.is_empty():
+		_music.stop()
+		return
+	var stream: AudioStreamOggVorbis = load("res://assets/music/%s.ogg" % _playlist[_track_index])
+	stream.loop = true
+	_music.stream = stream
+	_music.volume_db = SILENT_DB
+	_music.play()
+	_fade = create_tween()
+	_fade.tween_property(_music, "volume_db", MUSIC_DB, 1.5)
+
+
+func play_jingle(jingle: String) -> void:
+	play_sfx(jingle, -2.0)
 
 
 # --- Životy ---------------------------------------------------------------
@@ -140,6 +224,7 @@ func _save() -> void:
 	config.set_value("player", "lives", lives)
 	config.set_value("player", "regen_start", _regen_start)
 	config.set_value("player", "best_stars", best_stars)
+	config.set_value("settings", "music", music_enabled)
 	config.save(SAVE_PATH)
 
 
@@ -150,6 +235,7 @@ func _load() -> void:
 	lives = config.get_value("player", "lives", MAX_LIVES)
 	_regen_start = config.get_value("player", "regen_start", _now())
 	best_stars = config.get_value("player", "best_stars", {})
+	music_enabled = config.get_value("settings", "music", true)
 
 
 func _now() -> int:

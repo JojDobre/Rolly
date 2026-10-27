@@ -3,9 +3,12 @@ extends Control
 
 const UI := preload("res://scripts/ui_theme.gd")
 const BACKGROUND := preload("res://scripts/background.gd")
-const TEX_STAR := preload("res://assets/items/starGold.png")
-const TEX_STAR_EMPTY := preload("res://assets/items/starSilver.png")
-const TEX_LIFE := preload("res://assets/ui/ball_icon.png")
+const TEX_STAR := preload("res://assets/objects/star.png")
+const TEX_LIFE := preload("res://assets/objects/hud_heart.png")
+const TEX_BUTTON_SQUARE := preload("res://assets/controls/button_square.png")
+const TEX_MUSIC_ON := preload("res://assets/controls/icon_music.png")
+const TEX_MUSIC_OFF := preload("res://assets/controls/icon_music_disabled.png")
+const STAR_DIM := Color(0.15, 0.2, 0.3, 0.45)
 
 var _lives_label: Label
 var _timer_label: Label
@@ -69,8 +72,31 @@ func _ready() -> void:
 	_message.add_theme_color_override("font_color", Color("a51d16"))
 	inner.add_child(_message)
 
+	_build_music_toggle()
 	GameState.lives_changed.connect(_on_lives_changed)
+	GameState.play_music(GameState.MENU_PLAYLIST)
 	_refresh()
+
+
+## Tlačidlo vpravo hore na zapnutie a vypnutie hudby.
+func _build_music_toggle() -> void:
+	var toggle := TextureButton.new()
+	toggle.texture_normal = TEX_BUTTON_SQUARE
+	toggle.ignore_texture_size = true
+	toggle.stretch_mode = TextureButton.STRETCH_SCALE
+	toggle.custom_minimum_size = Vector2(72, 72)
+	toggle.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	toggle.offset_left = -96
+	toggle.offset_right = -24
+	toggle.offset_top = 24
+	toggle.offset_bottom = 96
+	var icon := _icon(TEX_MUSIC_ON if GameState.music_enabled else TEX_MUSIC_OFF, 40)
+	icon.position = Vector2(16, 16)
+	toggle.add_child(icon)
+	toggle.pressed.connect(func():
+		GameState.set_music_enabled(not GameState.music_enabled)
+		icon.texture = TEX_MUSIC_ON if GameState.music_enabled else TEX_MUSIC_OFF)
+	add_child(toggle)
 
 
 func _process(_delta: float) -> void:
@@ -108,7 +134,10 @@ func _level_button(level: int) -> Control:
 	stars.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var best := int(GameState.best_stars.get(level, 0))
 	for i in 3:
-		stars.add_child(_icon(TEX_STAR if i < best else TEX_STAR_EMPTY, 30))
+		var star := _icon(TEX_STAR, 34)
+		if i >= best:
+			star.self_modulate = STAR_DIM
+		stars.add_child(star)
 	box.add_child(stars)
 	if button.disabled:
 		box.modulate.a = 0.4

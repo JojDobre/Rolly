@@ -36,12 +36,15 @@ Dotykové tlačidlá sa zobrazia len na zariadení s dotykovou obrazovkou.
 Level je obyčajný text v `levels/level_XX.gd`. Jeden znak je jedna dlaždica (64 × 64 px):
 
 ```
-.  prázdno        #  zem              =  tenká plošina
-/  svah           P  štart            F  cieľ
+.  prázdno        #  zem              =  lietajúca plošina
+/  svah           P  štart            F  cieľ (dvere, 2 dlaždice vysoké)
 *  hviezda        C  checkpoint       ^  bodce
-B  drevená krabica   M  kovová krabica
-K  kľúč           L  zámok            >  šípka (ozdoba)
+B  drevená krabica   M  ťažká krabica
+K  kľúč           L  zámok            >  tabuľa so šípkou
+g  tráva   u  krík   m  hríb   o  kameň   (ozdoby bez kolízie)
 ```
+
+Rohy a okraje zeme sa vyberú samé podľa susedných blokov.
 
 - Všetky riadky musia mať rovnakú dĺžku.
 - Každý level má mať presne 3 hviezdy, jeden štart `P` a jeden cieľ `F`.
@@ -59,14 +62,22 @@ Náhľad levelov je v `levels_preview.png`. Po úprave levelu ho obnovíš prík
 | `scripts/ball_visual.gd` | vzhľad guličky (farby, oči, sploštenie) |
 | `scripts/game.gd` | priebeh levelu: hviezdy, smrť, checkpoint, cieľ, kamera |
 | `scripts/level_builder.gd` | z textovej mapy postaví level (kolízie, predmety, krabice) |
-| `scripts/terrain_art.gd` | kreslí terén v štýle Red Ball: tráva, hlina, obrys |
 | `scripts/background.gd` | pozadie: nebo, oblaky a kopce s paralaxou |
 | `scripts/hud.gd` | rozhranie počas hry a panely (pauza, koniec levelu, došli životy) |
 | `scripts/menu.gd` | hlavné menu a výber levelov |
 | `scripts/game_state.gd` | životy, ukladanie, zvuky, miesta pre reklamy |
-| `assets/world/` | vlastná grafika sveta, vygenerovaná skriptom `tools/generate_art.py` |
-| `assets/` | ostatná grafika a zvuky (Kenney, GameArt2D – licencie v `assets/licenses`) |
-| `assets/worlds/` | pripravené dlaždice pre svet Továreň a Vesmír |
+| `assets/tiles`, `assets/objects`, `assets/backgrounds` | Kenney New Platformer Pack |
+| `assets/controls` | Kenney Mobile Controls (štýl E) |
+| `assets/sfx` | Kenney Impact Sounds, `assets/sfx/jingles` Kenney Music Jingles |
+| `assets/music` | hudba na pozadí (CC0, autori v `assets/licenses/music.txt`) |
+| `assets/ui` | Kenney UI Pack Adventure (panely a tlačidlá v menu) |
+
+## Hudba a zvuky
+
+- Hudba hrá v menu aj v leveli. Skladby levelu sa striedajú (playlist), krátke slučky sa opakujú aspoň 90 sekúnd.
+- Playlisty a melódie pre udalosti (koniec levelu, checkpoint, kľúč, smrť) sú nastavené v `scripts/game_state.gd`
+  (`LEVEL_PLAYLIST`, `MENU_PLAYLIST`, `JINGLE_*`). Stačí vymeniť názov súboru.
+- Hudbu zapneš alebo vypneš tlačidlom s notou v menu. Nastavenie sa uloží.
 
 ## Reklamy
 
