@@ -42,8 +42,25 @@ func build(level_data: Dictionary, world: Dictionary, target: Node2D) -> void:
 	_oneway_body = _static_body("Platforms", 2)
 
 	for pos in cells:
+		if submerged(pos):
+			water[pos] = true
+			var wave := _sprite(root, _tex("water"), Vector2(pos.x * T + T / 2.0, pos.y * T + T / 2.0))
+			wave.z_index = 6
+			wave.modulate.a = 0.7
 		_build_cell(pos, cells[pos])
 	_add_merged_solids()
+
+
+## Predmet vo vode (hviezda, ryba, minca...) má okolo seba vodu – voda je aj v jeho bunke.
+func submerged(pos: Vector2i) -> bool:
+	var kind: String = Catalog.get_item(cells.get(pos, {}).get("t", "")).get("kind", "")
+	if not kind in ["coin", "star", "powerup", "key", "mob", "deco", "hazard", "bomb"]:
+		return false
+	var around := 0
+	for dir in [Vector2i.UP, Vector2i.LEFT, Vector2i.RIGHT, Vector2i.DOWN]:
+		if _is(pos + dir, "water") or (dir == Vector2i.UP and _is(pos + dir, "water")):
+			around += 1
+	return _is(pos + Vector2i.UP, "water") or around >= 3
 
 
 # --- Bunky -------------------------------------------------------------------

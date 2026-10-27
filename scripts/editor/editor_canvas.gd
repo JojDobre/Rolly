@@ -53,6 +53,8 @@ func _draw_cell(pos: Vector2i, cell: Dictionary) -> void:
 	if item.is_empty():
 		return
 	var rect := Rect2(pos * T, Vector2(T, T))
+	if _loader.submerged(pos):
+		draw_texture_rect(_tile("water"), rect, false, Color(1, 1, 1, 0.8))
 	match item["kind"]:
 		"ground":
 			draw_texture_rect(_terrain(_loader._ground_tile(pos)), rect, false)

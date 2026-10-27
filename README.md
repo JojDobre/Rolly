@@ -1,103 +1,142 @@
-# Gulička – kostra hry v Godote
+# Rolly
 
-Fyzikálna plošinovka: gulička sa kotúľa po mape, zbiera hviezdy a dostáva sa do cieľa.
+Mobilná plošinovka v Godote 4.4. Hráš za guľovú postavičku (Kenney Shape Characters),
+zbieraš hviezdy a mince a prechádzaš levelmi plnými funkčných blokov a mobov.
+Súčasťou hry je **editor svetov a levelov**.
 
-## Ako to spustiť
+## Spustenie
 
-1. Stiahni si **Godot 4.4** (verzia „Standard“, nie .NET): https://godotengine.org/download
-2. Spusti Godot, klikni na **Import** a vyber súbor `project.godot` z tohto priečinka.
-3. Pri prvom otvorení Godot chvíľu importuje obrázky a zvuky.
-4. Hru spustíš klávesom **F5**.
-
-Ak Godot pri spustení vypíše chybu, skopíruj mi text z panela **Output** alebo **Debugger** a opravím ju.
+1. Stiahni **Godot 4.4** (verzia Standard): https://godotengine.org/download
+2. V Godote daj **Import** a vyber `project.godot`.
+3. **F5** spustí hru.
 
 ## Ovládanie
 
 | Akcia | Klávesnica | Mobil |
 |---|---|---|
-| Kotúľanie | ← → alebo A D | tlačidlá vľavo dole |
-| Skok (dlhšie držanie = vyšší skok) | medzerník, ↑ alebo W | tlačidlo vpravo dole |
-| Pauza | Esc alebo P | tlačidlo II |
+| Chôdza | ← → / A D | šípky vľavo dole |
+| Skok (dlhšie držanie = vyšší) | medzerník / Z / J | okrúhle tlačidlo |
+| Rebrík hore / páčka | ↑ / W | šípka hore |
+| Rebrík dole | ↓ / S | šípka dole |
+| Zoskočiť z plošiny | dole + skok | dole + skok |
+| Pauza | Esc / P | tlačidlo pauzy |
 
-Dotykové tlačidlá sa zobrazia len na zariadení s dotykovou obrazovkou.
+## Postavička
 
-## Čo už hra vie
+Vyberáš ju v hlavnom menu: 5 farieb × 4 tvary (guľa, oblý štvorec, kocka, kosoštvorec).
+Tvár mení výraz podľa toho, čo robíš (beh, skok, pád, zranenie, potápanie, cieľ), ruky gestikulujú.
+Má 3 srdcia zdravia. Po strate všetkých príde o život (10 životov, +1 každých 30 minút, 100 mincí = +1 život).
 
-- Gulička s fyzikou: kotúľanie, skok s odpustením tesne po zídení z hrany, sploštenie pri dopade, oči sledujú pohyb, žmurkanie, strach pri páde.
-- 3 hviezdy v každom leveli. Najlepší výsledok sa uloží.
-- 10 životov, nový život každých 30 minút (počíta sa aj pri vypnutej hre), +1 život za reklamu (zatiaľ atrapa).
-- Bodce, pád do jamy, checkpointy, cieľová vlajka.
-- Krabice, ktoré sa dajú tlačiť, kľúč a zámok na hádankové levely.
-- Menu s výberom levelov. Ďalší level sa odomkne až po dokončení predchádzajúceho.
-- Zvuky dopadu podľa sily nárazu, zatrasenie obrazovky a vibrácia pri tvrdom dopade.
+## Predmety a ich funkcie
 
-## Ako robiť nové levely
+**Terén** (štýl podľa sveta): zem (rohy sa vyberú samé), plošiny, cez ktoré sa dá vyskočiť zospodu, svahy, steny, dosky, mosty.
 
-Level je obyčajný text v `levels/level_XX.gd`. Jeden znak je jedna dlaždica (64 × 64 px):
+**Bloky**
+- Rozbitná tehla: rozbiješ ju hlavou zospodu alebo bombou.
+- Blok s mincou / s 5 mincami: úder hlavou vyhodí mincu.
+- Blok s prekvapením: vyhodí zvolený predmet (srdce, drahokam, mincu, moba).
+- Blok s mobom: vypustí moba.
+- Padajúci blok: po stúpení sa zatrasie, spadne a po chvíli sa vráti.
+- Miznúci most: chvíľu po stúpení zmizne a o 3 s sa objaví znova.
+- Krabica: dá sa tlačiť a stáť na nej.
 
-```
-.  prázdno        #  zem              =  lietajúca plošina
-/  svah           P  štart            F  cieľ (dvere, 2 dlaždice vysoké)
-*  hviezda        C  checkpoint       ^  bodce
-B  drevená krabica   M  ťažká krabica
-K  kľúč           L  zámok            >  tabuľa so šípkou
-g  tráva   u  krík   m  hríb   o  kameň   (ozdoby bez kolízie)
-```
+**Zbieranie**
+- Mince: bronzová 1, strieborná 2, zlatá 5.
+- Hviezdy: v každom leveli presne 3, určujú hodnotenie.
+- Srdce: +1 zdravie.
+- Drahokamy: červený +1 život, modrý rýchlosť, zelený vysoký skok, žltý neporaziteľnosť.
 
-Rohy a okraje zeme sa vyberú samé podľa susedných blokov.
+**Mechanizmy**
+- Kľúč (4 farby): po zobratí zmiznú všetky zámky rovnakej farby.
+- Tlačidlo: po stúpení prepne farebné bloky svojej farby na zvolený čas, potom sa vrátia.
+- Páčka (pri nej stlač hore): natrvalo prepne farebné bloky a pohne výťahmi svojej farby.
+- Výťah: po prepnutí páčky sa posunie hore alebo dole o zvolený počet dlaždíc.
+- Pružina: vystrelí hráča vysoko.
+- Pás: posúva všetko, čo na ňom stojí.
+- Rebrík a lano: lezie sa po nich hore a dole.
+- Bomba: po dotyku sa zapáli a o 2 s vybuchne. Zničí moby, tehly a krabice v okruhu, zapáli iné bomby a zabije hráča v dosahu.
 
-- Všetky riadky musia mať rovnakú dĺžku.
-- Každý level má mať presne 3 hviezdy, jeden štart `P` a jeden cieľ `F`.
-- Svah `/` sa sám natočí smerom k susednému bloku zeme.
-- Nový level pridáš tak, že skopíruješ `level_03.gd` ako `level_04.gd` a v `scripts/game_state.gd` zvýšiš `LEVEL_COUNT`.
+**Nebezpečné**
+- Bodce, blok s bodcami, kaktus, hríby, píla: zraňujú.
+- Láva: zabije hneď.
+- Voda: dá sa v nej plávať, ale po 8 s pod vodou sa hráč utopí (ukazovateľ dychu).
+- Ohnivá guľa: vyskakuje hore a dole.
+- Závažie: spadne na hráča pod ním.
 
-Pre orientáciu: skok je vysoký asi 2 dlaždice (na 3 dlaždice sa už nedá vyskočiť, iba z krabice) a cez jamu širokú 4 dlaždice sa preskočí.
-Náhľad levelov je v `levels_preview.png`. Po úprave levelu ho obnovíš príkazom `python3 tools/preview_levels.py`.
+**Moby** (33)
+- Na väčšinu sa dá skočiť.
+- Ohnivý a pichľavý sliz, ryby, píly, duch a vysoké hady sa skočením poraziť nedajú.
+- Slimák sa schová do ulity a ulitu môžeš kopnúť do ostatných mobov.
+- Žaba skáče k hráčovi, netopier visí, kým neprídeš blízko, a duch sa hýbe, len keď sa naň nepozeráš.
 
-## Kde čo je
+## Editor
 
-| Súbor | Čo robí |
-|---|---|
-| `scripts/ball.gd` | fyzika a ovládanie guličky (rýchlosť, výška skoku – dá sa meniť v Inspectore) |
-| `scripts/ball_visual.gd` | vzhľad guličky (farby, oči, sploštenie) |
-| `scripts/game.gd` | priebeh levelu: hviezdy, smrť, checkpoint, cieľ, kamera |
-| `scripts/level_builder.gd` | z textovej mapy postaví level (kolízie, predmety, krabice) |
-| `scripts/background.gd` | pozadie: nebo, oblaky a kopce s paralaxou |
-| `scripts/hud.gd` | rozhranie počas hry a panely (pauza, koniec levelu, došli životy) |
-| `scripts/menu.gd` | hlavné menu a výber levelov |
-| `scripts/game_state.gd` | životy, ukladanie, zvuky, miesta pre reklamy |
-| `assets/tiles`, `assets/objects`, `assets/backgrounds` | Kenney New Platformer Pack |
-| `assets/controls` | Kenney Mobile Controls (štýl E) |
-| `assets/sfx` | Kenney Impact Sounds, `assets/sfx/jingles` Kenney Music Jingles |
-| `assets/music` | hudba na pozadí (CC0, autori v `assets/licenses/music.txt`) |
-| `assets/ui` | Kenney UI Pack Adventure (panely a tlačidlá v menu) |
+Hlavné menu → **Editor levelov**.
+
+1. **Nový svet**: názov, štýl blokov (tráva, hlina, piesok, sneh, kameň, fialová), pozadie, hudba.
+2. **Nový level**: otvorí editor s pripravenou zemou, štartom a cieľom.
+3. **V editore:**
+   - **Paleta dole** je rozdelená na kategórie. Terén sa kreslí v štýle sveta.
+   - **Nástroje vľavo:** Kresliť, Guma, Posun (alebo dva prsty / pravé tlačidlo myši), Upraviť (nastavenie položeného predmetu). Priblíženie robíš štipnutím, kolieskom alebo tlačidlami +/−.
+   - **Nastavenia predmetu** sú v paneli vpravo: farba páčky a výťahu, obsah bloku, smer, vzdialenosť, dosah bomby, čas tlačidla…
+   - **Kontrola** hneď ukáže, čo v leveli chýba: kľúč bez zámku, tlačidlo bez blokov, páčka bez výťahu, chýbajúci štart, cieľ alebo hviezdy. Tlačidlom „Položiť“ rovno vyberieš chýbajúci predmet aj so správnou farbou.
+   - **Skúsiť** spustí level bez straty životov. Z pauzy alebo po dokončení sa vrátiš do editora.
+   - **Uložiť** uloží level. Level s chybami sa uloží ako rozpracovaný a v zozname na hranie sa neukáže, kým ho neopravíš.
+
+### Kde sa svety ukladajú
+
+- Na telefóne: `user://worlds/*.json`, teda len v tom telefóne.
+- Pri spustení z Godot editora na počítači: `data/worlds/*.json` v projekte. Tieto svety sa dodávajú s hrou, takže ich stačí commitnúť.
+
+Ukážkový svet sa dá pregenerovať príkazom `python3 tools/demo_levels.py`.
 
 ## Hudba a zvuky
 
-- Hudba hrá v menu aj v leveli. Skladby levelu sa striedajú (playlist), krátke slučky sa opakujú aspoň 90 sekúnd.
-- Playlisty a melódie pre udalosti (koniec levelu, checkpoint, kľúč, smrť) sú nastavené v `scripts/game_state.gd`
-  (`LEVEL_PLAYLIST`, `MENU_PLAYLIST`, `JINGLE_*`). Stačí vymeniť názov súboru.
-- Hudbu zapneš alebo vypneš tlačidlom s notou v menu. Nastavenie sa uloží.
+- Nárazy sú z Kenney Impact Sounds, melódie pri udalostiach z Kenney Music Jingles.
+- Hudba na pozadí je CC0 z OpenGameArt, autori sú v `assets/licenses/music.txt`.
+- Playlisty a melódie nastavíš v `scripts/game_state.gd`.
+
+## Testy
+
+Automatické testy bežia v Godote bez okna:
+
+```
+godot --headless --path . --script res://tests/mechanics.gd    # 53 testov mechaník
+godot --headless --path . --script res://tests/editor_test.gd  # 17 testov editora
+godot --headless --path . --script res://tests/compile_all.gd  # kontrola všetkých skriptov
+```
+
+Screenshoty (potrebujú displej, napríklad `xvfb-run`): `tests/screenshot.gd` a `tests/ui_shot.gd`.
+
+## Štruktúra
+
+| Priečinok / súbor | Obsah |
+|---|---|
+| `scripts/catalog.gd` | všetky predmety a moby: názov, kategória, funkcia, parametre |
+| `scripts/level_loader.gd` | postaví level z dát |
+| `scripts/level_validator.gd` | kontrola párov a povinných prvkov |
+| `scripts/player.gd`, `player_visual.gd` | hráč a jeho vzhľad |
+| `scripts/entities/` | správanie blokov, predmetov a mobov |
+| `scripts/game.gd`, `hud.gd` | priebeh levelu a rozhranie |
+| `scripts/menu.gd`, `scripts/editor/` | menu a editor |
+| `scripts/content.gd` | ukladanie svetov a levelov |
+| `data/worlds/` | svety dodávané s hrou |
 
 ## Reklamy
 
-V `scripts/game_state.gd` sú dve pripravené funkcie:
+V `scripts/game_state.gd` sú pripravené funkcie `show_rewarded_ad()` (+1 život) a `maybe_show_interstitial()` (po leveli).
+Zatiaľ sú to atrapy. Neskôr ich napojíme na AdMob.
 
-- `show_rewarded_ad()` – reklama, ktorú si hráč spustí sám (+1 život). Zatiaľ dá odmenu hneď.
-- `maybe_show_interstitial()` – reklama po leveli, ktorá sa dá hneď zavrieť. Zatiaľ nerobí nič.
+## Grafika a licencie
 
-Neskôr ich napojíme na AdMob (plugin „Godot AdMob“).
+Kenney (CC0):
+- New Platformer Pack
+- Shape Characters
+- Platformer Art Extended Enemies
+- Platformer Pack Remastered (čiastočky tehál)
+- Mobile Controls
+- UI Pack Adventure
+- Impact Sounds
+- Music Jingles
 
-## Export na Android (neskôr)
-
-- V Godote: Editor → Manage Export Templates → Download.
-- Project → Export → Add → Android. V časti Permissions zaškrtni **Vibrate**, inak nebude fungovať vibrovanie.
-- Potrebuješ Android SDK a JDK 17. Návod: https://docs.godotengine.org/en/stable/tutorials/export/exporting_for_android.html
-
-## Ďalšie kroky
-
-1. Vyskúšať a doladiť pocit z guličky (rýchlosť, skok, odraz).
-2. Svet 2 (Továreň) so železnými guľami a svet 3 (Vesmír) s otočenou gravitáciou.
-3. Boss každých 15 levelov.
-4. Duch (záznam najlepšieho pokusu) a denná výzva s rebríčkom.
-5. Obchod so skinmi guličky.
+Licencie sú v `assets/licenses`.

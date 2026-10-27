@@ -19,7 +19,8 @@ func _run() -> void:
 	var only := OS.get_cmdline_user_args()
 	var tests := ["chodza", "skok", "kluc", "mince_blok", "tehla", "tlacidlo", "packa_vytah", "pruzina",
 		"bomba", "mob_skok", "mob_zranenie", "bodce", "utopenie", "lava", "rebrik", "padajuci_blok",
-		"miznuci_most", "ciel", "drahokamy", "slimak_ulita", "krabica", "pas", "vsetky_moby", "zavazie"]
+		"miznuci_most", "ciel", "drahokamy", "slimak_ulita", "krabica", "pas", "vsetky_moby", "zavazie",
+		"ukazka_vytah", "ukazka_bomba", "ukazka_kluce", "ukazka_pruzina"]
 	for test in tests:
 		if only.size() > 0 and not only.has(test):
 			continue
@@ -431,3 +432,64 @@ func _count_script(name: String) -> int:
 		if node.get_script() and String(node.get_script().resource_path).ends_with(name + ".gd"):
 			count += 1
 	return count
+
+
+# --- Ukážkové levely (data/worlds/ukazka.json) ---------------------------------
+
+func _demo(level_id: String) -> void:
+	var content = root.get_node("Content")
+	gs.test_world = content.get_world("ukazka")
+	gs.test_level = content.get_level("ukazka", level_id)
+	change_scene_to_file("res://scenes/game.tscn")
+	await process_frame
+	await process_frame
+	game = current_scene
+	await _frames(10)
+
+
+func t_ukazka_vytah() -> void:
+	print("Ukážka: páčka postaví most z výťahov")
+	await _demo("m3")
+	var lifts := get_nodes_in_group("channel_green")
+	await _put_player(28, 11)
+	await _tap("move_up")
+	await _seconds(1.2)
+	check("8 výťahov sa zdvihlo na úroveň zeme", lifts.size() == 8 and lifts.all(func(l): return is_equal_approx(l.position.y, 12 * T + T / 2.0)), str(lifts.map(func(l): return l.position.y)))
+	await _hold("move_right", 3.0)
+	check("hráč prešiel po moste", game.player.global_position.x > 39 * T and not game.player.dead, str(game.player.global_position))
+
+
+func t_ukazka_bomba() -> void:
+	print("Ukážka: bomba zničí tehlovú stenu")
+	await _demo("m4")
+	await _put_player(25, 11)
+	await _put_player(4, 11)
+	await _seconds(2.5)
+	check("tehly zmizli", _count_script("breakable") == 0, str(_count_script("breakable")))
+	check("hráč prežil", not game.player.dead)
+
+
+func t_ukazka_kluce() -> void:
+	print("Ukážka: kľúč a tlačidlo")
+	await _demo("m2")
+	await _put_player(8, 10)
+	await _frames(10)
+	check("červené zámky zmizli", get_nodes_in_group("lock_red").size() == 0)
+	await _put_player(18, 11)
+	await _hold("move_right", 1.8)
+	check("cez modrú bránu prešiel včas", game.player.global_position.x > 24 * T + 40, str(game.player.global_position))
+
+
+func t_ukazka_pruzina() -> void:
+	print("Ukážka: pružina vystrelí na rímsu")
+	await _demo("m3")
+	await _put_player(6, 11)
+	Input.action_press("move_right")
+	await _seconds(0.35)
+	Input.action_release("move_right")
+	await _seconds(1.4)
+	Input.action_press("move_right")
+	await _seconds(0.3)
+	Input.action_release("move_right")
+	await _seconds(0.6)
+	check("hráč stojí na rímse", game.player.global_position.y < 7 * T and game.player.is_on_floor(), str(game.player.global_position))
