@@ -213,9 +213,10 @@ func _crate(heavy: bool, pos: Vector2) -> RigidBody2D:
 	var crate := RigidBody2D.new()
 	crate.position = pos
 	crate.add_to_group("pushable")
-	crate.mass = 1.6 if heavy else 0.4
+	crate.mass = 2.0 if heavy else 0.7
+	crate.linear_damp = 0.5  # krabica po náraze neodletí ďaleko
 	var material := PhysicsMaterial.new()
-	material.friction = 0.5 if heavy else 0.3
+	material.friction = 0.6 if heavy else 0.45
 	crate.physics_material_override = material
 	var sprite := _sprite(crate, TEX_CRATE_METAL if heavy else TEX_CRATE_WOOD, Vector2.ZERO)
 	sprite.scale = Vector2.ONE * (CRATE_SIZE / 70.0)

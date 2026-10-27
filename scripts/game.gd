@@ -136,7 +136,7 @@ func _on_finish_body_entered(body: Node, finish: Area2D) -> void:
 func _on_ball_landed(impact_speed: float) -> void:
 	if impact_speed < 250.0:
 		return
-	var strength := inverse_lerp(250.0, 1400.0, impact_speed)
+	var strength := inverse_lerp(250.0, 850.0, impact_speed)
 	ball.visual.squash(strength)
 	GameState.play_sfx("impactSoft_medium_000", lerpf(-14.0, 0.0, strength), randf_range(0.9, 1.1))
 	if strength > 0.55:

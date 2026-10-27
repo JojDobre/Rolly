@@ -7,12 +7,14 @@ signal jumped
 @export var max_spin := 26.0        ## rad/s pri plnej rýchlosti
 @export var spin_accel := 70.0      ## ako rýchlo sa roztočí
 @export var brake := 10.0           ## brzdenie, keď hráč nič nedrží
-@export var air_force := 1400.0     ## ovládanie vo vzduchu
-@export var max_speed := 520.0
-@export var jump_speed := 700.0     ## ~2,4 dlaždice vysoko pri gravitácii 1600
+@export var air_force := 900.0      ## ovládanie vo vzduchu
+@export var max_speed := 520.0      ## max. rýchlosť na zemi
+@export var max_air_speed := 400.0  ## max. vodorovná rýchlosť vo vzduchu
+@export var max_fall_speed := 850.0 ## gulička nepadá rýchlejšie
+@export var jump_speed := 610.0     ## ~2,4 dlaždice vysoko pri gravitácii 1200
 @export var coyote_time := 0.1      ## skok ešte chvíľu po zídení z hrany
 @export var jump_buffer := 0.12     ## skok stlačený tesne pred dopadom
-@export var push_force := 900.0     ## pomoc pri tlačení krabíc, aby sa nemusela rozbiehať
+@export var push_force := 300.0     ## pomoc pri tlačení krabíc (len zo zeme)
 
 var input_enabled := true
 
@@ -46,6 +48,7 @@ func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 
 	var dir := Input.get_axis("move_left", "move_right") if input_enabled else 0.0
 	var was_grounded := _grounded
+	var pushed: RigidBody2D = null
 	_grounded = false
 	for i in state.get_contact_count():
 		var normal := state.get_contact_local_normal(i)
@@ -55,7 +58,9 @@ func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 		elif dir != 0.0 and normal.x * dir < -0.5:
 			var crate := state.get_contact_collider_object(i) as RigidBody2D
 			if crate and crate.is_in_group("pushable"):
-				crate.apply_central_force(Vector2(dir * push_force, 0.0))
+				pushed = crate
+	if pushed and _grounded:
+		pushed.apply_central_force(Vector2(dir * push_force, 0.0))
 	if _grounded:
 		_since_ground = 0.0
 		if not was_grounded and _prev_vy > 0.0:
@@ -70,7 +75,12 @@ func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 	elif _grounded:
 		state.angular_velocity = move_toward(state.angular_velocity, 0.0, brake * state.step)
 
-	velocity.x = clampf(velocity.x, -max_speed, max_speed)
+	if _grounded:
+		velocity.x = clampf(velocity.x, -max_speed, max_speed)
+	elif absf(velocity.x) > max_air_speed:
+		# Vo vzduchu sa gulička plynulo spomalí na max_air_speed.
+		velocity.x = move_toward(velocity.x, signf(velocity.x) * max_air_speed, 500.0 * state.step)
+	velocity.y = minf(velocity.y, max_fall_speed)
 
 	if _since_jump_press < jump_buffer and _since_ground < coyote_time:
 		velocity.y = -jump_speed
