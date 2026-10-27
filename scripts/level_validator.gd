@@ -4,6 +4,9 @@ extends RefCounted
 
 const Catalog := preload("res://scripts/catalog.gd")
 
+## Parametre predmetov, ktoré sa dajú meniť v editore (v tomto poradí).
+const EDITABLE := ["color", "content", "mob", "direction", "distance", "radius", "time", "height", "hits", "solid"]
+
 
 ## Vráti [{ "text": String, "need": id alebo "", "params": {} }]
 static func check(level: Dictionary) -> Array:
@@ -65,6 +68,8 @@ static func check(level: Dictionary) -> Array:
 ## Krátka nápoveda po položení predmetu (čo k nemu treba pridať).
 static func hint_for(id: String, params: Dictionary) -> String:
 	var color: String = params.get("color", "")
+	if color == "" and id.contains("_"):
+		color = id.substr(id.rfind("_") + 1)
 	var cname: String = Catalog.COLOR_NAMES.get(color, "")
 	if id.begins_with("key_"):
 		return "Teraz polož zámok (%s), ktorý kľúč odomkne." % cname

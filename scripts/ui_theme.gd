@@ -34,6 +34,21 @@ static func make() -> Theme:
 	return theme
 
 
+## Kompaktný vzhľad pre editor (menšie okraje, aby sa zmestil na mobil).
+static func make_compact() -> Theme:
+	var theme := make()
+	theme.default_font_size = 20
+	theme.set_stylebox("panel", "PanelContainer", _box(TEX_PANEL, 20, 6))
+	for state in ["normal", "hover", "pressed", "disabled"]:
+		var box: StyleBoxTexture = theme.get_stylebox(state, "Button").duplicate()
+		box.content_margin_left = 10
+		box.content_margin_right = 10
+		box.content_margin_top = 6
+		box.content_margin_bottom = 6
+		theme.set_stylebox(state, "Button", box)
+	return theme
+
+
 ## Červené tlačidlo pre hlavnú akciu (Ďalej, Hrať).
 static func primary_button(text: String) -> Button:
 	var button := Button.new()

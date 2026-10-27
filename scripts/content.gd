@@ -139,6 +139,8 @@ func _path(world: Dictionary) -> String:
 
 func _read_dir(dir: String) -> Array:
 	var result := []
+	if not DirAccess.dir_exists_absolute(dir):
+		return result
 	var access := DirAccess.open(dir)
 	if access == null:
 		return result
