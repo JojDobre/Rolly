@@ -31,8 +31,13 @@ Má 3 srdcia zdravia. Po strate všetkých príde o život (10 životov, +1 kaž
 
 **Terén** (štýl podľa sveta): zem (rohy sa vyberú samé), plošiny, cez ktoré sa dá vyskočiť zospodu, svahy, steny, dosky, mosty.
 
+**Terén na skrýše a podzemie**
+- Tajná stena: vyzerá ako zem, ale dá sa cez ňu prejsť. Keď do nej hráč vojde, spriehľadní sa. Dá sa nakresliť aj cez predmet, napríklad cez hviezdu, ktorá je potom schovaná v stene.
+- Stena podzemia / stena hradu: tmavé pozadie jaskyne. Je to vrstva, takže mince, moby a ďalšie predmety na nej ju nezmažú. Guma zmaže najprv predmet, potom stenu.
+
 **Bloky**
-- Rozbitná tehla: rozbiješ ju hlavou zospodu alebo bombou.
+- Rozbitná tehla: rozbiješ ju hlavou zospodu alebo bombou. Je svetlejšia ako pevná tehlová stena.
+- Skrytý blok: nie je ho vidieť a dá sa cezeň prejsť. Keď doň hráč udrie hlavou zospodu, objaví sa a vyhodí zvolený obsah.
 - Blok s mincou / s 5 mincami: úder hlavou vyhodí mincu.
 - Blok s prekvapením: vyhodí zvolený predmet (srdce, drahokam, mincu, moba).
 - Blok s mobom: vypustí moba.
@@ -51,6 +56,8 @@ Má 3 srdcia zdravia. Po strate všetkých príde o život (10 životov, +1 kaž
 - Tlačidlo: po stúpení prepne farebné bloky svojej farby na zvolený čas, potom sa vrátia.
 - Páčka (pri nej stlač hore): natrvalo prepne farebné bloky a pohne výťahmi svojej farby.
 - Výťah: po prepnutí páčky sa posunie hore alebo dole o zvolený počet dlaždíc.
+- Prechodové dvere (4 farby): pri dverách stlač hore a prejdeš k druhým dverám rovnakej farby, napríklad do tajnej miestnosti pod zemou.
+- Pohyblivá plošina: jazdí tam a späť vodorovne alebo zvisle o zvolený počet dlaždíc. Susedné plošiny sa spoja do jednej.
 - Pružina: vystrelí hráča vysoko.
 - Pás: posúva všetko, čo na ňom stojí.
 - Rebrík a lano: lezie sa po nich hore a dole.
@@ -68,6 +75,24 @@ Má 3 srdcia zdravia. Po strate všetkých príde o život (10 životov, +1 kaž
 - Ohnivý a pichľavý sliz, ryby, píly, duch a vysoké hady sa skočením poraziť nedajú.
 - Slimák sa schová do ulity a ulitu môžeš kopnúť do ostatných mobov.
 - Žaba skáče k hráčovi, netopier visí, kým neprídeš blízko, a duch sa hýbe, len keď sa naň nepozeráš.
+
+## Svety
+
+**Zelené kopce** (svet 1), levely inšpirované Super Mariom:
+
+| Level | Dĺžka | Čo v ňom je |
+|---|---|---|
+| 1-1 Zelené kopce | 206 | bloky, piliere, diery, tajná miestnosť pod zemou (červené dvere na pilieri), hviezda schovaná v schodoch |
+| 1-2 Podzemná chodba | 200 | jaskyňa, bomba pred tehlovou stenou, plošina nad priepasťou, netopiere, tajná cesta po tehlovom strope, schovaný tunel |
+| 1-3 Nad oblakmi | 180 | stĺpy a oblaky nad priepasťou, pohyblivé a padajúce plošiny, miznúce mosty, pružiny, neviditeľné bloky k hviezde |
+| 1-4 Hrad | 190 | láva s ohnivými guľami, drviče, píly, závažia, výťah ku kľúču, skrýša v strope, zamknutá brána |
+| 1-5 Jazero a jaskyňa | 300 | svah, jazero s rybami a hviezdou na dne, jaskyňa s tlačidlom a rebríkom ku kľúču, páčka s výťahom, zvislý výťah nad priepasťou |
+
+Každý level má 1 checkpoint na 150 dlaždíc dĺžky.
+
+Levely generuje `python3 tools/world1.py` a dajú sa ďalej upravovať v editore.
+
+`python3 tools/reach.py data/worlds/<svet>.json [--map]` overí, či sa dá dostať ku každej hviezde, kľúču a do cieľa. Simuluje chôdzu, skoky, rebríky, vodu, pružiny, dvere, rozbíjanie tehál, skryté bloky, kľúče, tlačidlá, páčky a bomby. S `--map` vypíše mapu miest, kam sa hráč dostane.
 
 ## Editor
 
@@ -102,8 +127,8 @@ Ukážkový svet sa dá pregenerovať príkazom `python3 tools/demo_levels.py`.
 Automatické testy bežia v Godote bez okna:
 
 ```
-godot --headless --path . --script res://tests/mechanics.gd    # 63 testov mechaník
-godot --headless --path . --script res://tests/editor_test.gd  # 20 testov editora
+godot --headless --path . --script res://tests/mechanics.gd    # testy mechaník (aj kontrola 5 levelov sveta 1)
+godot --headless --path . --script res://tests/editor_test.gd  # testy editora
 godot --headless --path . --script res://tests/compile_all.gd  # kontrola všetkých skriptov
 ```
 

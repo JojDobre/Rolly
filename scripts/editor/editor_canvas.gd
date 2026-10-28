@@ -60,8 +60,18 @@ func _draw_cell(pos: Vector2i, cell: Dictionary) -> void:
 	if item.is_empty():
 		return
 	var rect := Rect2(pos * T, Vector2(T, T))
+	if cell.get("bg", "") == "secret_wall":
+		draw_texture_rect(_terrain(_loader._ground_tile(pos)), rect, false, Color(1, 1, 1, 0.55))
+		draw_rect(rect.grow(-6), Color(0.55, 0.2, 0.9, 0.9), false, 3.0)
+	elif cell.has("bg"):
+		var bg_icon: String = Catalog.get_item(cell["bg"]).get("icon", "terrain:block_center")
+		var bg: Texture2D = _terrain("block_center") if bg_icon.begins_with("terrain:") else _tile(bg_icon)
+		draw_texture_rect(bg, rect, false, Loader.BACKWALL_TINT)
+	if id == "fireball" and _loader.in_lava(pos):
+		draw_texture_rect(_tile("lava" if _loader.in_lava(pos + Vector2i.UP) else "lava_top"), rect, false)
 	if _loader.submerged(pos):
-		draw_texture_rect(_tile("water"), rect, false, Color(1, 1, 1, 0.8))
+		var surface: bool = not (_loader._is(pos + Vector2i.UP, "water") or _loader.submerged(pos + Vector2i.UP))
+		draw_texture_rect(_tile("water_top" if surface else "water"), rect, false, Color(1, 1, 1, 0.8))
 	match item["kind"]:
 		"ground":
 			_draw_flipped(_terrain(_loader._ground_tile(pos)), rect, _loader.under_rising_slope(pos))
@@ -80,8 +90,25 @@ func _draw_cell(pos: Vector2i, cell: Dictionary) -> void:
 				name = "rop_attached"
 			draw_texture_rect(_tile(name), rect, false)
 		"water", "lava":
-			var top: bool = not _loader._is(pos + Vector2i.UP, id)
+			var top: bool = not _loader._is(pos + Vector2i.UP, id) and not (id == "water" and _loader.submerged(pos + Vector2i.UP)) \
+					and not (id == "lava" and _loader.in_lava(pos + Vector2i.UP))
 			draw_texture_rect(_tile(id + ("_top" if top else "")), rect, false, Color(1, 1, 1, 0.8 if id == "water" else 1.0))
+		"secret":
+			_draw_flipped(_terrain(_loader._ground_tile(pos)), rect, _loader.under_rising_slope(pos))
+			draw_rect(rect.grow(-6), Color(0.55, 0.2, 0.9, 0.9), false, 3.0)
+			draw_rect(rect, Color(0.55, 0.2, 0.9, 0.18))
+		"backwall":
+			var wall: Texture2D = _terrain("block_center") if item["icon"].begins_with("terrain:") else _tile(item["icon"])
+			draw_texture_rect(wall, rect, false, Loader.BACKWALL_TINT)
+			return
+		"hidden_block":
+			draw_texture_rect(_tile("block_empty"), rect, false, Color(1, 1, 1, 0.35))
+			draw_rect(rect.grow(-4), Color(1, 1, 1, 0.9), false, 2.0)
+		"mover":
+			draw_texture_rect(_terrain("horizontal_middle"), rect, false)
+		"warp":
+			draw_texture_rect(_tile("door_closed"), rect, false)
+			draw_texture_rect(_tile("door_closed_top"), Rect2(rect.position - Vector2(0, T), rect.size), false)
 		"exit":
 			draw_texture_rect(_tile("door_closed"), rect, false)
 			draw_texture_rect(_tile("door_closed_top"), Rect2(rect.position - Vector2(0, T), rect.size), false)
@@ -91,6 +118,8 @@ func _draw_cell(pos: Vector2i, cell: Dictionary) -> void:
 			_draw_flipped(_tile("conveyor"), rect, cell.get("direction", "right") == "left")
 		"lever":
 			draw_texture_rect(_tile("lever_left"), rect, false)
+		"solid":
+			draw_texture_rect(_tex(Catalog.icon_path(id, terrain)), rect, false, Catalog.WALL_TINT if id.begins_with("bricks_") else Color.WHITE)
 		_:
 			_draw_fitted(_tex(Catalog.icon_path(id, terrain)), rect)
 	_draw_markers(pos, cell, item)
@@ -100,13 +129,20 @@ func _draw_cell(pos: Vector2i, cell: Dictionary) -> void:
 func _draw_markers(pos: Vector2i, cell: Dictionary, item: Dictionary) -> void:
 	var corner := Vector2(pos * T) + Vector2(T - 26, 2)
 	var params: Dictionary = item["params"]
-	if params.has("color") and item["kind"] in ["lever", "lift"]:
+	if params.has("color") and item["kind"] in ["lever", "lift", "warp"]:
 		draw_texture_rect(_tile("gem_" + cell.get("color", params["color"])), Rect2(corner, Vector2(24, 24)), false)
 	if item["kind"] == "item_block":
 		var content: String = cell.get("content", params.get("content", ""))
 		var icon := Catalog.icon_path(cell.get("mob", params.get("mob", "slime_normal"))) if content == "mob" else Catalog.icon_path(content)
 		if icon != "":
 			draw_texture_rect(_tex(icon), Rect2(corner, Vector2(24, 24)), false)
+	if item["kind"] == "mover":
+		var vertical: bool = cell.get("direction", params["direction"]) == "vertical"
+		var reach := int(cell.get("distance", params["distance"]))
+		var from := Vector2(pos * T) + Vector2(T / 2.0, T / 2.0)
+		var to := from + (Vector2(0, -T * reach) if vertical else Vector2(T * reach, 0))
+		draw_dashed_line(from, to, Color(0.1, 0.6, 0.3, 0.9), 3.0, 8.0)
+		draw_rect(Rect2(to - Vector2(T / 2.0, T / 2.0), Vector2(T, T)), Color(0.1, 0.6, 0.3, 0.6), false, 2.0)
 	if item["kind"] == "lift":
 		var up: bool = cell.get("direction", params["direction"]) == "up"
 		var distance := int(cell.get("distance", params["distance"]))

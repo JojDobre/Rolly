@@ -60,6 +60,15 @@ static func order() -> Array:
 	return _order
 
 
+## Pevné tehlové steny sú tmavšie, aby sa líšili od rozbitných tehál.
+const WALL_TINT := Color(0.72, 0.7, 0.78)
+
+
+## Pevné predmety zaberajú celú bunku – za nimi sa stena podzemia nekreslí.
+static func is_solid_kind(kind: String) -> bool:
+	return kind in ["ground", "solid", "slope", "secret", "breakable", "item_block", "lock", "color_block", "spike_block", "conveyor", "falling", "lift"]
+
+
 static func get_item(id: String) -> Dictionary:
 	return items().get(id, {})
 
@@ -98,21 +107,25 @@ static func _build() -> void:
 	_add("ground", "Zem", "teren", "terrain:block_top", "ground", {}, "Pevná zem. Rohy a okraje sa vyberú samé.")
 	_add("platform", "Plošina", "teren", "terrain:cloud", "platform", {}, "Zospodu sa cez ňu dá vyskočiť.")
 	_add("slope", "Svah", "teren", "terrain:ramp_short_b", "slope", {}, "Natočí sa sám k susednej zemi.")
-	_add("bricks_brown", "Tehlová stena", "teren", "bricks_brown", "solid")
-	_add("bricks_grey", "Šedá stena", "teren", "bricks_grey", "solid")
+	_add("bricks_brown", "Tehlová stena", "teren", "bricks_brown", "solid", {}, "Pevná stena, nedá sa rozbiť (je tmavšia ako rozbitná tehla).")
+	_add("bricks_grey", "Šedá stena", "teren", "bricks_grey", "solid", {}, "Pevná stena, nedá sa rozbiť (je tmavšia ako rozbitný kameň).")
 	_add("block_strong_empty", "Pevný blok", "teren", "block_strong_empty", "solid")
 	_add("block_empty", "Prázdny blok", "teren", "block_empty", "solid")
 	_add("block_plank", "Doska", "teren", "block_plank", "oneway", {}, "Tenká plošina, zospodu sa cez ňu dá vyskočiť.")
 	_add("bridge_logs", "Drevený most", "teren", "bridge_logs", "oneway")
+	_add("secret_wall", "Tajná stena", "teren", "terrain:block_center", "secret", {}, "Vyzerá ako zem, ale dá sa cez ňu prejsť. Keď do nej hráč vojde, spriehľadní sa.")
+	_add("backwall", "Stena podzemia", "teren", "terrain:block_center", "backwall", {}, "Tmavé pozadie jaskyne alebo podzemia. Nemá kolíziu.")
+	_add("backwall_bricks", "Stena hradu", "teren", "bricks_grey", "backwall", {}, "Tmavé tehlové pozadie hradu. Nemá kolíziu.")
 
 	# --- Bloky s funkciou ---
-	_add("brick_brown", "Rozbitná tehla", "bloky", "brick_brown", "breakable", {}, "Rozbije sa úderom hlavy zospodu alebo bombou.")
-	_add("brick_grey", "Rozbitný kameň", "bloky", "brick_grey", "breakable", {}, "Rozbije sa úderom hlavy zospodu alebo bombou.")
+	_add("brick_brown", "Rozbitná tehla", "bloky", "bricks_brown", "breakable", {}, "Rozbije sa úderom hlavy zospodu alebo bombou.")
+	_add("brick_grey", "Rozbitný kameň", "bloky", "bricks_grey", "breakable", {}, "Rozbije sa úderom hlavy zospodu alebo bombou.")
 	_add("block_coin", "Blok s mincou", "bloky", "block_coin", "item_block", {"content": "coin_gold", "hits": 1}, "Úder zospodu vyhodí mincu.")
 	_add("block_strong_coin", "Blok s 5 mincami", "bloky", "block_strong_coin", "item_block", {"content": "coin_gold", "hits": 5}, "Každý úder vyhodí mincu, spolu 5.")
 	_add("block_exclamation", "Blok s prekvapením", "bloky", "block_exclamation", "item_block", {"content": "heart", "hits": 1}, "Úder zospodu vyhodí zvolený predmet.")
 	_add("block_strong_exclamation", "Silný blok s prekvapením", "bloky", "block_strong_exclamation", "item_block", {"content": "gem_yellow", "hits": 1}, "Ako blok s prekvapením, ale nedá sa rozbiť bombou.")
 	_add("block_strong_danger", "Blok s mobom", "bloky", "block_strong_danger", "item_block", {"content": "mob", "mob": "slime_normal", "hits": 1}, "Úder zospodu vypustí moba.")
+	_add("block_hidden", "Skrytý blok", "bloky", "block_empty", "hidden_block", {"content": "coin_gold", "hits": 1}, "Nie je vidieť. Objaví sa, keď doň hráč udrie hlavou zospodu.")
 	_add("block_empty_warning", "Padajúci blok", "bloky", "block_empty_warning", "falling", {}, "Keď naň stúpiš, zatrasie sa a spadne. Po chvíli sa vráti.")
 	_add("bridge", "Miznúci most", "bloky", "bridge", "vanishing", {}, "Chvíľu po stúpení zmizne, potom sa objaví znova.")
 	_add("block_planks", "Krabica", "bloky", "block_planks", "crate", {}, "Dá sa tlačiť a stáť na nej.")
@@ -139,6 +152,8 @@ static func _build() -> void:
 		_add("block_" + color, "Farebný blok (%s)" % cname, "mechanizmy", "block_" + color, "color_block", {"color": color, "solid": true}, "Prepína ho tlačidlo alebo páčka rovnakej farby.")
 	_add("lever", "Páčka", "mechanizmy", "lever_left", "lever", {"color": "red"}, "Natrvalo prepne farebné bloky a pohne výťahmi svojej farby.")
 	_add("lift", "Výťah", "mechanizmy", "terrain:horizontal_middle", "lift", {"color": "red", "direction": "up", "distance": 3}, "Po prepnutí páčky rovnakej farby sa posunie hore alebo dole.")
+	_add("moving_platform", "Pohyblivá plošina", "mechanizmy", "terrain:horizontal_middle", "mover", {"direction": "horizontal", "distance": 3}, "Jazdí tam a späť. Susedné plošiny sa spoja do jednej.")
+	_add("door_warp", "Prechodové dvere", "mechanizmy", "door_closed", "warp", {"color": "red"}, "Šípkou hore prejdeš k druhým dverám rovnakej farby (napr. do podzemia).")
 	_add("spring", "Pružina", "mechanizmy", "spring", "spring", {}, "Vystrelí hráča vysoko do vzduchu.")
 	_add("conveyor", "Pás", "mechanizmy", "conveyor", "conveyor", {"direction": "right"}, "Posúva všetko, čo na ňom stojí.")
 	_add("ladder", "Rebrík", "mechanizmy", "ladder_middle", "ladder", {}, "Lezie sa hore a dole šípkami.")

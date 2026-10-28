@@ -13,11 +13,11 @@ func _run() -> void:
 	var content = root.get_node("Content")
 	if page in ["pauza", "koniec"]:
 		gs.current_world_id = "zelene_kopce"
-		gs.current_level_id = "l1"
+		gs.current_level_id = "1-1"
 		change_scene_to_file("res://scenes/game.tscn")
 	elif page.begins_with("editor") and page != "editor_svety" and page != "editor_levely":
 		gs.editor_world_id = "zelene_kopce"
-		gs.editor_level_id = "l3"
+		gs.editor_level_id = "1-2"
 		change_scene_to_file("res://scenes/editor.tscn")
 	else:
 		change_scene_to_file("res://scenes/menu.tscn")

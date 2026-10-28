@@ -168,6 +168,30 @@ func unlock(color: String) -> void:
 
 # --- Mechanizmy ---------------------------------------------------------------
 
+## Prechod dverami k druhým dverám rovnakej farby (napr. do podzemia a späť).
+func warp(door: Node2D) -> void:
+	var target: Node2D = door.partner()
+	if target == null or not running or player.dead or not player.input_enabled:
+		return
+	player.input_enabled = false
+	player.velocity = Vector2.ZERO
+	door.flash_open()
+	GameState.play_sfx("impact/impactWood_medium_002", -4.0, 0.9)
+	var tween := create_tween()
+	tween.tween_property(player, "modulate:a", 0.0, 0.2)
+	await tween.finished
+	player.global_position = target.global_position + Vector2(0, 2)
+	player.velocity = Vector2.ZERO
+	camera.global_position = player.global_position
+	camera.reset_smoothing()
+	target.flash_open()
+	var back := create_tween()
+	back.tween_property(player, "modulate:a", 1.0, 0.2)
+	await back.finished
+	if not player.dead:
+		player.input_enabled = true
+
+
 func press_switch(color: String, seconds: float) -> void:
 	_switch_until[color] = Time.get_ticks_msec() / 1000.0 + seconds
 	_update_channel(color)

@@ -132,6 +132,9 @@ LEVELS = [
     ]),
 ]
 
+# Hádanka s krabicou (pôvodne v Zelených kopcoch) – level nakreslený v editore.
+LEVELS.append(json.loads((ROOT / "tools" / "hadanka_krabica.json").read_text()))
+
 if __name__ == "__main__":
     world = {
         "version": 1, "id": "ukazka", "name": "Ukážka mechaník", "terrain": "dirt",

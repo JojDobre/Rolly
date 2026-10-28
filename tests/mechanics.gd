@@ -20,7 +20,8 @@ func _run() -> void:
 	var tests := ["chodza", "skok", "kluc", "mince_blok", "tehla", "tlacidlo", "packa_vytah", "pruzina",
 		"bomba", "mob_skok", "mob_zranenie", "bodce", "utopenie", "lava", "rebrik", "padajuci_blok",
 		"miznuci_most", "ciel", "drahokamy", "slimak_ulita", "krabica", "pas", "vsetky_moby", "zavazie",
-		"ukazka_vytah", "ukazka_bomba", "ukazka_kluce", "ukazka_pruzina", "hadanka_krabica", "cesta_moba"]
+		"ukazka_vytah", "ukazka_bomba", "ukazka_kluce", "ukazka_pruzina", "hadanka_krabica", "cesta_moba",
+		"dvere_prechod", "skryty_blok", "tajna_stena", "pohybliva_plosina", "svet1_levely"]
 	for test in tests:
 		if only.size() > 0 and not only.has(test):
 			continue
@@ -520,8 +521,8 @@ func t_ukazka_pruzina() -> void:
 func t_hadanka_krabica() -> void:
 	print("Level Kľúč a krabica: bez krabice na rímsu nevyskočí, s krabicou áno")
 	var content = root.get_node("Content")
-	gs.test_world = content.get_world("zelene_kopce")
-	gs.test_level = content.get_level("zelene_kopce", "l3")
+	gs.test_world = content.get_world("ukazka")
+	gs.test_level = content.get_level("ukazka", "m6")
 	change_scene_to_file("res://scenes/game.tscn")
 	await process_frame
 	await process_frame
@@ -583,3 +584,120 @@ func t_cesta_moba() -> void:
 	check("včela letí šikmo medzi bodmi cesty", bee["min"].x < 5 * T and bee["max"].x > 14 * T and bee["min"].y < 3 * T, str(bee["min"], bee["max"]))
 	var saw: Dictionary = mobs["saw_mob"]
 	check("píla jazdí medzi bodmi cesty", saw["min"].x < 19 * T and saw["max"].x > 24 * T, str(saw["min"], saw["max"]))
+
+
+func t_dvere_prechod() -> void:
+	print("Prechodové dvere")
+	# Druhé dvere sú v uzavretej miestnosti (stena podzemia), kam sa inak nedá dostať.
+	var cells := {}
+	for x in range(15, 27):
+		cells["%d,12" % x] = "ground"
+	for x in range(16, 26):
+		for y in range(13, 16):
+			cells["%d,%d" % [x, y]] = "backwall"
+	for y in range(12, 16):
+		cells["15,%d" % y] = "ground"
+		cells["26,%d" % y] = "ground"
+	cells["4,15"] = {"t": "door_warp", "color": "blue"}
+	cells["20,15"] = {"t": "door_warp", "color": "blue"}
+	await _level(cells, 30, 18)
+	await _put_player(4, 15)
+	Input.action_press("move_up")
+	await _frames(4)
+	Input.action_release("move_up")
+	await _seconds(0.8)
+	var p: Vector2 = game.player.global_position
+	check("prešiel k druhým dverám", p.distance_to(_cell(20, 15)) < 40.0, str(p))
+	check("hráč sa môže znova hýbať", game.player.input_enabled)
+
+
+func t_skryty_blok() -> void:
+	print("Skrytý blok")
+	await _level({"8,10": "ground", "8,7": {"t": "block_hidden", "content": "coin_gold"}, "12,9": "block_hidden"})
+	# prejde cez skrytý blok zboku (nie je pevný)
+	await _put_player(10, 9)
+	await _hold("move_right", 0.6)
+	check("zboku sa cezeň prejde", game.player.global_position.x > _cell(12, 9).x + 20.0, str(game.player.global_position.x))
+	await _put_player(8, 9)
+	var coins_before: int = game.coins
+	await _tap("jump")
+	await _seconds(1.2)
+	check("úder zospodu vyhodí mincu", game.coins > coins_before, str(game.coins))
+	var block = _find_block(Vector2(8, 7))
+	check("blok sa objavil", block != null and block.get_node("Sprite").visible)
+	# teraz sa na ňom dá stáť
+	game.player.global_position = _cell(8, 5)
+	game.player.velocity = Vector2.ZERO
+	await _seconds(0.8)
+	check("na objavenom bloku sa dá stáť", game.player.is_on_floor() and game.player.global_position.y < _cell(8, 7).y, str(game.player.global_position))
+
+
+func _find_block(cell: Vector2) -> Node:
+	for node in game.level_root.get_children():
+		if node is StaticBody2D and node.get("secret") != null and node.global_position.distance_to(_cell(int(cell.x), int(cell.y))) < 4.0:
+			return node
+	return null
+
+
+func t_tajna_stena() -> void:
+	print("Tajná stena")
+	var cells := {}
+	for y in range(6, 10):
+		cells["10,%d" % y] = "secret_wall"
+		cells["11,%d" % y] = "secret_wall"
+	cells["14,9"] = "star"
+	await _level(cells)
+	await _hold("move_right", 3.2)
+	check("prešiel cez tajnú stenu", game.player.global_position.x > _cell(12, 9).x, str(game.player.global_position.x))
+	check("zobral hviezdu za stenou", game.stars_collected == 1)
+	var wall: Node = null
+	for node in game.level_root.get_children():
+		if node.get_script() and node.get_script().resource_path.ends_with("secret.gd"):
+			wall = node
+	check("stena je jedna skupina", wall != null and wall.get_child_count() == 9, str(wall.get_child_count() if wall else -1))
+
+
+func t_pohybliva_plosina() -> void:
+	print("Pohyblivá plošina")
+	var cells := {}
+	for x in range(6, 30):
+		cells["%d,10" % x] = "lava"
+		cells["%d,11" % x] = "ground"
+	for x in range(6, 9):
+		cells["%d,8" % x] = {"t": "moving_platform", "direction": "horizontal", "distance": 6}
+	await _level(cells)
+	var movers: Array = game.level_root.get_children().filter(func(n): return n is AnimatableBody2D and n.get("vertical") != null)
+	check("tri bunky = jedna plošina", movers.size() == 1, str(movers.size()))
+	game.player.global_position = _cell(7, 7)
+	game.player.velocity = Vector2.ZERO
+	await _frames(10)
+	var x0: float = game.player.global_position.x
+	await _seconds(2.5)
+	check("hráč stojí na plošine", game.player.is_on_floor() and not game.player.dead)
+	check("plošina hráča vezie", game.player.global_position.x > x0 + 120.0, str(game.player.global_position.x - x0))
+
+
+func t_svet1_levely() -> void:
+	print("Svet 1: každý level sa postaví bez chýb a prejde kontrolou editora")
+	var content = root.get_node("Content")
+	var Validator = load("res://scripts/level_validator.gd")
+	var world: Dictionary = content.get_world("zelene_kopce")
+	check("svet má 5 levelov", world.get("levels", []).size() == 5, str(world.get("levels", []).size()))
+	for level in world.get("levels", []):
+		var problems: Array = Validator.check(level)
+		check("%s: kontrola editora bez problémov" % level["name"], problems.is_empty(), str(problems))
+		var width := int(level["width"])
+		var checkpoints := 0
+		for key in level["cells"]:
+			if level["cells"][key]["t"] == "checkpoint":
+				checkpoints += 1
+		check("%s: dĺžka %d, checkpointy %d" % [level["name"], width, checkpoints], width >= 150 and checkpoints == width / 150)
+		gs.test_world = world
+		gs.test_level = level
+		change_scene_to_file("res://scenes/game.tscn")
+		await process_frame
+		await process_frame
+		game = current_scene
+		await _frames(30)
+		check("%s: hráč stojí na štarte" % level["name"], game.player.is_on_floor() and not game.player.dead)
+		check("%s: 3 hviezdy" % level["name"], game.stars_total == 3)

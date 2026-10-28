@@ -8,6 +8,9 @@ const E := "res://scripts/entities/%s.gd"
 
 const SOLID_KINDS := ["ground", "solid"]
 const ONEWAY_TOPS := {"platform": 0.0, "block_plank": 0.0, "bridge_logs": 0.0}
+## Pri výbere dlaždíc zeme sa tieto bunky správajú ako zem (tajná stena a podzemie splynú so zemou).
+const GROUND_LIKE := ["ground", "slope", "secret_wall", "backwall", "backwall_bricks"]
+const BACKWALL_TINT := Color(0.42, 0.4, 0.5)
 
 var level: Dictionary
 var terrain := "grass"
@@ -44,11 +47,16 @@ func build(level_data: Dictionary, world: Dictionary, target: Node2D) -> void:
 	for pos in cells:
 		if submerged(pos):
 			water[pos] = true
-			var wave := _sprite(root, _tex("water"), Vector2(pos.x * T + T / 2.0, pos.y * T + T / 2.0))
+			var surface := not (_is(pos + Vector2i.UP, "water") or submerged(pos + Vector2i.UP))
+			var wave := _sprite(root, _tex("water_top" if surface else "water"), Vector2(pos.x * T + T / 2.0, pos.y * T + T / 2.0))
 			wave.z_index = 6
 			wave.modulate.a = 0.7
+		if cells[pos].has("bg") and Catalog.get_item(cells[pos]["bg"]).get("kind", "") == "backwall":
+			_backwall(String(cells[pos]["bg"]), Vector2(pos.x * T + T / 2.0, pos.y * T + T / 2.0))
 		_build_cell(pos, cells[pos])
 	_add_merged_solids()
+	_add_secrets()
+	_add_movers()
 
 
 ## Predmet vo vode (hviezda, ryba, minca...) má okolo seba vodu – voda je aj v jeho bunke.
@@ -61,6 +69,13 @@ func submerged(pos: Vector2i) -> bool:
 		if _is(pos + dir, "water") or (dir == Vector2i.UP and _is(pos + dir, "water")):
 			around += 1
 	return _is(pos + Vector2i.UP, "water") or around >= 3
+
+
+## Ohnivá guľa medzi lávou je tiež v láve (bunka s láve okolo).
+func in_lava(pos: Vector2i) -> bool:
+	if _is(pos, "lava"):
+		return true
+	return _is(pos, "fireball") and (_is(pos + Vector2i.LEFT, "lava") or _is(pos + Vector2i.RIGHT, "lava"))
 
 
 # --- Bunky -------------------------------------------------------------------
@@ -81,7 +96,9 @@ func _build_cell(pos: Vector2i, cell: Dictionary) -> void:
 			var ground := _sprite(_terrain_body, _terrain_tex(_ground_tile(pos)), center)
 			ground.flip_h = under_rising_slope(pos)
 		"solid":
-			_sprite(_terrain_body, _tex(id), center)
+			var wall := _sprite(_terrain_body, _tex(id), center)
+			if id.begins_with("bricks_"):
+				wall.modulate = Catalog.WALL_TINT
 		"platform":
 			_sprite(_oneway_body, _terrain_tex(_platform_tile(pos)), center)
 			_oneway(pos, 0.0, 52.0)
@@ -91,12 +108,25 @@ func _build_cell(pos: Vector2i, cell: Dictionary) -> void:
 		"slope":
 			_slope(pos, center)
 		"breakable":
-			_body(StaticBody2D.new(), "breakable", center, _tex(id), Vector2(T, T), Vector2.ZERO,
+			_body(StaticBody2D.new(), "breakable", center, _tex(item["icon"]), Vector2(T, T), Vector2.ZERO,
 					{"particle": "brickGrey" if id == "brick_grey" else "brickBrown"})
-		"item_block":
-			_body(StaticBody2D.new(), "item_block", center, _tex(id), Vector2(T, T), Vector2.ZERO, {
+		"item_block", "hidden_block":
+			_body(StaticBody2D.new(), "item_block", center, _tex(item["icon"]), Vector2(T, T), Vector2.ZERO, {
 				"item_id": id, "content": params.get("content", "coin_gold"),
-				"mob": params.get("mob", "slime_normal"), "hits": int(params.get("hits", 1))})
+				"mob": params.get("mob", "slime_normal"), "hits": int(params.get("hits", 1)),
+				"secret": item["kind"] == "hidden_block"})
+		"backwall":
+			_backwall(id, center)
+		"warp":
+			var warp_color: String = params.get("color", "red")
+			var warp := _trigger("warp", center, {"down": ["door_closed"], "up": ["door_open"]}, "warp", {"color": warp_color})
+			var warp_top := AnimatedSprite2D.new()
+			warp_top.name = "Top"
+			warp_top.sprite_frames = _frames({"down": ["door_closed_top"], "up": ["door_open_top"]}, 1.0)
+			warp_top.animation = "down"
+			warp_top.position = Vector2(0, -T)
+			warp.add_child(warp_top)
+			warp.add_child(_color_marker(warp_color, Vector2(0, -T - 14)))
 		"falling":
 			_body(AnimatableBody2D.new(), "falling_block", center, _tex(id), Vector2(T, T), Vector2.ZERO, {},
 					_sensor(Vector2(T - 8, 12), Vector2(0, -T / 2.0 - 4)))
@@ -148,13 +178,16 @@ func _build_cell(pos: Vector2i, cell: Dictionary) -> void:
 			spiky.add_to_group("hurts_on_touch")
 		"lava":
 			lava[pos] = true
-			_sprite(root, _tex("lava_top" if not _is(pos + Vector2i.UP, "lava") else "lava"), center).z_index = 2
+			_sprite(root, _tex("lava_top" if not in_lava(pos + Vector2i.UP) else "lava"), center).z_index = 2
 		"water":
 			water[pos] = true
-			var wave := _sprite(root, _tex("water_top" if not _is(pos + Vector2i.UP, "water") else "water"), center)
+			var wave := _sprite(root, _tex("water_top" if not (_is(pos + Vector2i.UP, "water") or submerged(pos + Vector2i.UP)) else "water"), center)
 			wave.z_index = 6
 			wave.modulate.a = 0.7
 		"fireball":
+			if in_lava(pos):
+				lava[pos] = true
+				_sprite(root, _tex("lava_top" if not in_lava(pos + Vector2i.UP) else "lava"), center).z_index = 2
 			var fire = _area("fireball", center, _tex(id), Vector2(30, 30), Vector2.ZERO, {"height": int(params.get("height", 3))})
 			fire.z_index = 3
 		"weight":
@@ -277,10 +310,12 @@ func _sensor(size: Vector2, offset: Vector2) -> Area2D:
 	return sensor
 
 
-func _trigger(kind: String, center: Vector2, anims: Dictionary) -> Area2D:
+func _trigger(kind: String, center: Vector2, anims: Dictionary, script := "trigger", props := {}) -> Area2D:
 	var area := Area2D.new()
-	area.set_script(load(E % "trigger"))
+	area.set_script(load(E % script))
 	area.kind = kind
+	for key in props:
+		area.set(key, props[key])
 	area.position = center
 	var sprite := AnimatedSprite2D.new()
 	sprite.name = "Sprite"
@@ -403,6 +438,89 @@ func _add_merged_solids() -> void:
 			x = x_end + 1
 
 
+func _backwall(id: String, center: Vector2) -> void:
+	var icon: String = Catalog.get_item(id).get("icon", "terrain:block_center")
+	var wall := _sprite(root, _terrain_tex("block_center") if icon.begins_with("terrain:") else _tex(icon), center)
+	wall.modulate = BACKWALL_TINT
+	wall.z_index = -2
+
+
+## Tajné steny: každá súvislá skupina je jeden uzol, ktorý sa spriehľadní, keď do nej hráč vojde.
+func _add_secrets() -> void:
+	var done := {}
+	for pos in cells:
+		if done.has(pos) or not _is_secret(pos):
+			continue
+		var group: Node2D = load(E % "secret").new()
+		group.z_index = 7
+		var area := Area2D.new()
+		area.collision_layer = 0
+		area.collision_mask = 1 << 2
+		group.add_child(area)
+		var todo := [pos]
+		done[pos] = true
+		while not todo.is_empty():
+			var p: Vector2i = todo.pop_back()
+			var center := Vector2(p.x * T + T / 2.0, p.y * T + T / 2.0)
+			if not cells[p].has("bg") or cells[p]["bg"] == "secret_wall":
+				_backwall("backwall", center)  # po spriehľadnení je za stenou tmavá skrýša
+			var sprite := _sprite(group, _terrain_tex(_ground_tile(p)), center)
+			sprite.flip_h = under_rising_slope(p)
+			area.add_child(_rect(Vector2(T - 20, T - 20), center))
+			for dir in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
+				if not done.has(p + dir) and _is_secret(p + dir):
+					done[p + dir] = true
+					todo.append(p + dir)
+		root.add_child(group)
+
+
+## Tajná stena môže byť aj vrstvou pred predmetom (napr. hviezda schovaná v stene).
+func _is_secret(pos: Vector2i) -> bool:
+	return _is(pos, "secret_wall") or (cells.has(pos) and cells[pos].get("bg", "") == "secret_wall")
+
+
+## Pohyblivé plošiny: vodorovne susedné bunky s rovnakými nastaveniami tvoria jednu plošinu.
+func _add_movers() -> void:
+	var done := {}
+	for y in height:
+		for x in width:
+			var pos := Vector2i(x, y)
+			if done.has(pos) or not _is(pos, "moving_platform"):
+				continue
+			var cell: Dictionary = cells[pos]
+			var length := 1
+			while _is(pos + Vector2i(length, 0), "moving_platform") \
+					and _same_mover(cells[pos + Vector2i(length, 0)], cell):
+				length += 1
+			for i in length:
+				done[pos + Vector2i(i, 0)] = true
+			var mover := AnimatableBody2D.new()
+			mover.set_script(load(E % "mover"))
+			mover.position = Vector2(pos.x * T, pos.y * T)
+			mover.collision_layer = 2
+			mover.collision_mask = 0
+			mover.vertical = cell.get("direction", "horizontal") == "vertical"
+			mover.distance = int(cell.get("distance", 3))
+			for i in length:
+				var tile := "horizontal_middle"
+				if length == 1:
+					tile = "block"
+				elif i == 0:
+					tile = "horizontal_left"
+				elif i == length - 1:
+					tile = "horizontal_right"
+				_sprite(mover, _terrain_tex(tile), Vector2(i * T + T / 2.0, T / 2.0))
+			var top := _rect(Vector2(length * T, 24), Vector2(length * T / 2.0, 12))
+			top.one_way_collision = true
+			mover.add_child(top)
+			root.add_child(mover)
+
+
+func _same_mover(a: Dictionary, b: Dictionary) -> bool:
+	return a.get("direction", "horizontal") == b.get("direction", "horizontal") \
+			and int(a.get("distance", 3)) == int(b.get("distance", 3))
+
+
 ## Svah stúpa doprava (k susednej zemi vpravo alebo nemá zem vľavo).
 func slope_rising(pos: Vector2i) -> bool:
 	return _is(pos + Vector2i.RIGHT, "ground") or not _is_any(pos + Vector2i.LEFT, ["ground", "slope"])
@@ -455,7 +573,7 @@ func _ground_at(pos: Vector2i, edge_is_ground: bool) -> bool:
 		return edge_is_ground
 	if pos.y < 0:
 		return false
-	return _is_any(pos, ["ground", "slope"])
+	return _is_any(pos, GROUND_LIKE) or (cells.has(pos) and cells[pos].has("bg"))
 
 
 func _is(pos: Vector2i, id: String) -> bool:

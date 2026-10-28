@@ -53,6 +53,33 @@ func _run() -> void:
 	problems = Validator.check(editor.level)
 	check("po zámku je pár kompletný", not problems.any(func(p): return p["text"].contains("Kľúč") or p["text"].contains("Zámok")))
 
+	# stena podzemia je vrstva pozadia: predmet na nej ju nezmaže, guma zmaže najprv predmet
+	editor._select_item("backwall")
+	editor._apply_tool(Vector2i(20, 8))
+	editor._select_item("coin_gold")
+	editor._apply_tool(Vector2i(20, 8))
+	var layered: Dictionary = editor.level["cells"].get("20,8", {})
+	check("minca na stene podzemia si stenu ponechá", layered.get("t") == "coin_gold" and layered.get("bg") == "backwall", str(layered))
+	editor._set_tool("erase")
+	editor._apply_tool(Vector2i(20, 8))
+	check("guma zmaže mincu, stena zostane", editor.level["cells"].get("20,8", {}).get("t") == "backwall")
+	editor._apply_tool(Vector2i(20, 8))
+	check("druhá guma zmaže aj stenu", not editor.level["cells"].has("20,8"))
+	editor._set_tool("paint")
+	# prechodové dvere potrebujú pár rovnakej farby
+	editor._select_item("door_warp")
+	editor.tool_params["color"] = "yellow"
+	editor._apply_tool(Vector2i(24, 11))
+	problems = Validator.check(editor.level)
+	var warp_need = problems.filter(func(p): return p["need"] == "door_warp")
+	check("jedny prechodové dvere žiadajú druhé", warp_need.size() == 1 and warp_need[0]["params"].get("color") == "yellow", str(problems))
+	editor._select_item("door_warp", {"color": "yellow"})
+	editor._apply_tool(Vector2i(30, 11))
+	problems = Validator.check(editor.level)
+	check("po druhých dverách je pár kompletný", not problems.any(func(p): return p["need"] == "door_warp"))
+	for key in ["24,11", "30,11"]:
+		editor.level["cells"].erase(key)
+
 	editor._select_item("lever")
 	editor.tool_params["color"] = "green"
 	editor._apply_tool(Vector2i(5, 11))

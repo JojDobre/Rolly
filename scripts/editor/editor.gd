@@ -175,7 +175,22 @@ func _apply_tool(cell: Vector2i) -> void:
 			var new_cell := {"t": item}
 			for k in tool_params:
 				new_cell[k] = tool_params[k]
-			if cells.get(key, {}) == new_cell:
+			# Stena podzemia a tajná stena sú vrstva: predmet v bunke zostane (pred stenou podzemia,
+			# za tajnou stenou).
+			var old_cell: Dictionary = cells.get(key, {})
+			var old_kind: String = Catalog.get_item(old_cell.get("t", "")).get("kind", "")
+			var new_kind: String = Catalog.get_item(item).get("kind", "")
+			var layers := ["backwall", "secret"]
+			if new_kind in layers and not old_cell.is_empty() and not old_kind in layers:
+				if not Catalog.is_solid_kind(old_kind):
+					new_cell = old_cell.duplicate()
+					new_cell["bg"] = item
+			elif not new_kind in layers and not Catalog.is_solid_kind(new_kind):
+				if old_kind in layers:
+					new_cell["bg"] = old_cell["t"]
+				elif old_cell.has("bg"):
+					new_cell["bg"] = old_cell["bg"]
+			if old_cell == new_cell:
 				return
 			var first_in_stroke := not _stroke_saved
 			_save_undo()
@@ -191,7 +206,11 @@ func _apply_tool(cell: Vector2i) -> void:
 			if not cells.has(key):
 				return
 			_save_undo()
-			cells.erase(key)
+			# najprv zmizne predmet, stena podzemia za ním zostane
+			if cells[key].has("bg"):
+				cells[key] = {"t": cells[key]["bg"]}
+			else:
+				cells.erase(key)
 		"edit":
 			_edit_cell = cell
 			canvas.selected = cell
@@ -262,7 +281,7 @@ func _select_item(id: String, params := {}) -> void:
 	var defaults: Dictionary = Catalog.get_item(id)["params"]
 	var kind: String = Catalog.get_item(id)["kind"]
 	for key in Validator.EDITABLE:
-		if defaults.has(key) and not (key == "color" and not kind in ["lever", "lift"]):
+		if defaults.has(key) and not (key == "color" and not kind in ["lever", "lift", "warp"]):
 			tool_params[key] = params.get(key, defaults[key])
 	var cat: String = Catalog.get_item(id)["cat"]
 	if cat != _category:
@@ -524,7 +543,7 @@ func _show_properties() -> void:
 	var any := false
 	var kind: String = Catalog.get_item(id)["kind"]
 	for key in Validator.EDITABLE:
-		if not defaults.has(key) or (key == "color" and not kind in ["lever", "lift"]):
+		if not defaults.has(key) or (key == "color" and not kind in ["lever", "lift", "warp"]):
 			continue
 		any = true
 		_props_box.add_child(_property_editor(key, target, defaults))
@@ -613,6 +632,8 @@ func _property_editor(key: String, target: Dictionary, defaults: Dictionary) -> 
 					options[id] = Catalog.get_item(id)["name"]
 			elif defaults.get("direction", "") in ["up", "down"]:
 				options = {"up": "Hore", "down": "Dole"}
+			elif defaults.get("direction", "") in ["horizontal", "vertical"]:
+				options = {"horizontal": "Vodorovne (doprava a späť)", "vertical": "Zvisle (hore a späť)"}
 			else:
 				options = {"left": "Doľava", "right": "Doprava"}
 			box.add_child(_small({"content": "Obsah", "mob": "Mob", "direction": "Smer"}[key]))

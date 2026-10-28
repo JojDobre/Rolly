@@ -14,6 +14,7 @@ static func check(level: Dictionary) -> Array:
 	var count := {}
 	var lever_colors := {}
 	var lift_colors := {}
+	var warp_colors := {}
 	var cells: Dictionary = level.get("cells", {})
 	for key in cells:
 		var cell: Dictionary = cells[key]
@@ -23,10 +24,13 @@ static func check(level: Dictionary) -> Array:
 			lever_colors[cell.get("color", "red")] = true
 		elif id == "lift":
 			lift_colors[cell.get("color", "red")] = true
-		elif id == "door_exit":
+		elif id == "door_warp":
+			var warp_color: String = cell.get("color", "red")
+			warp_colors[warp_color] = warp_colors.get(warp_color, 0) + 1
+		if id in ["door_exit", "door_warp"]:
 			var pos := _pos(key)
 			var above: Dictionary = cells.get("%d,%d" % [pos.x, pos.y - 1], {})
-			if not above.is_empty():
+			if not above.is_empty() and Catalog.get_item(above.get("t", "")).get("kind", "") != "backwall":
 				problems.append(_problem("Nad dverami musí byť voľné miesto (dvere sú 2 dlaždice vysoké)."))
 
 	var starts: int = count.get("start", 0)
@@ -62,6 +66,12 @@ static func check(level: Dictionary) -> Array:
 			problems.append(_problem("Páčka (%s) nemá čo ovládať – pridaj výťah alebo farebné bloky." % cname, "lift", {"color": color}))
 		if lift_colors.has(color) and not lever_colors.has(color):
 			problems.append(_problem("Výťah (%s) nemá páčku." % cname, "lever", {"color": color}))
+
+		var warps: int = warp_colors.get(color, 0)
+		if warps == 1:
+			problems.append(_problem("Prechodové dvere (%s) nemajú druhé dvere." % cname, "door_warp", {"color": color}))
+		elif warps > 2:
+			problems.append(_problem("Prechodové dvere (%s) môžu byť len 2 (teraz %d)." % [cname, warps]))
 	return problems
 
 
@@ -87,6 +97,12 @@ static func hint_for(id: String, params: Dictionary) -> String:
 		return "Cestu moba nastavíš: Upraviť → ťukni na moba → Nastaviť cestu."
 	if id == "door_exit":
 		return "Dvere sú 2 dlaždice vysoké – nad nimi nechaj voľné miesto."
+	if id == "door_warp":
+		return "Polož druhé dvere rovnakej farby (%s). Prechádza sa medzi nimi šípkou hore." % Catalog.COLOR_NAMES.get(params.get("color", "red"), "")
+	if id == "secret_wall":
+		return "Tajná stena vyzerá ako zem, ale hráč ňou prejde."
+	if id == "block_hidden":
+		return "Skrytý blok nie je v hre vidieť, kým doň hráč neudrie zospodu."
 	return ""
 
 
