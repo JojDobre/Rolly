@@ -1,0 +1,9 @@
+# Godot zapisuje textové súbory s LF. Bez tohto by Git na Windowse
+# (core.autocrlf=true) hlásil všetky .import, .tscn a .gd súbory ako zmenené.
+* text=auto eol=lf
+
+*.png binary
+*.ogg binary
+*.wav binary
+*.ttf binary
+*.otf binary
